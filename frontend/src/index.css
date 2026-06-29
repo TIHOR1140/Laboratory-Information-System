@@ -44,3 +44,16 @@ textarea {
 ::selection {
   background: rgba(15, 118, 110, 0.18);
 }
+
+/* Add this at the bottom */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* Optional: Keep a nicer custom focus style */
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+}
