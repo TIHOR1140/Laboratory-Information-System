@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import {
   Building2,
+  FileText,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -16,6 +18,8 @@ const navigationByRole = {
   ADMIN: [
     { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'User Management', to: '/admin/users', icon: UsersRound },
+    { label: 'Tests', to: '/admin/tests', icon: FlaskConical },
+    { label: 'Templates', to: '/admin/templates', icon: FileText },
     { label: 'Profile', to: '/profile', icon: UserCircle2 },
   ],
   RECEPTIONIST: [

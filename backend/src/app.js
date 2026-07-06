@@ -4,6 +4,7 @@ const { clientUrl } = require('./config/env')
 const authRoutes = require('./routes/authRoutes')
 const profileRoutes = require('./routes/profileRoutes')
 const userRoutes = require('./routes/userRoutes')
+const adminRoutes = require('./routes/adminRoutes')
 const { notFound, errorHandler } = require('./middleware/error')
 
 function createApp() {
@@ -24,6 +25,7 @@ function createApp() {
   app.use('/api/auth', authRoutes)
   app.use('/api/profile', profileRoutes)
   app.use('/api/users', userRoutes)
+  app.use('/api/admin', adminRoutes)
 
   app.use(notFound)
   app.use(errorHandler)

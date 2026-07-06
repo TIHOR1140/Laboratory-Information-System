@@ -1,3 +1,4 @@
+-- Active: 1781882456968@@127.0.0.1@5432@lis_db
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -37,6 +38,32 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS tests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(100),
+  price DECIMAL(10,2) NOT NULL,
+  min_range DECIMAL(10,2),
+  max_range DECIMAL(10,2),
+  unit VARCHAR(50),
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS report_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  header TEXT,
+  footer TEXT,
+  logo_url TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
@@ -59,5 +86,17 @@ EXECUTE FUNCTION update_updated_at_column();
 DROP TRIGGER IF EXISTS set_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER set_user_profiles_updated_at
 BEFORE UPDATE ON user_profiles
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS set_tests_updated_at ON tests;
+CREATE TRIGGER set_tests_updated_at
+BEFORE UPDATE ON tests
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS set_report_templates_updated_at ON report_templates;
+CREATE TRIGGER set_report_templates_updated_at
+BEFORE UPDATE ON report_templates
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
