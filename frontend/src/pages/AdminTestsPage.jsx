@@ -1,5 +1,5 @@
 import { Edit3, FlaskConical, LoaderCircle, PlusCircle, Search, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AdminBanner, AdminSpinner, AdminTextField } from '../components/admin/AdminUi.jsx'
 import { api } from '../lib/api.js'
 
@@ -38,10 +38,6 @@ export function AdminTestsPage() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    void loadTests()
-  }, [])
 
   const categories = useMemo(() => ['ALL', ...Array.from(new Set(tests.map((test) => test.category).filter(Boolean)))], [tests])
 

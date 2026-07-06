@@ -1,5 +1,5 @@
 import { FileText, ImagePlus, LoaderCircle, PlusCircle } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AdminBanner, AdminSpinner, AdminTextField } from '../components/admin/AdminUi.jsx'
 import { api } from '../lib/api.js'
 
@@ -32,10 +32,6 @@ export function AdminTemplatesPage() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    void loadTemplates()
-  }, [])
 
   const resetForm = () => {
     setForm(emptyForm)
