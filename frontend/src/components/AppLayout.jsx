@@ -1,14 +1,12 @@
-import { useState } from 'react'
 import {
   Building2,
-  FileText,
-  FlaskConical,
   LayoutDashboard,
   LogOut,
   Menu,
   ShieldCheck,
   UserCircle2,
   UsersRound,
+  FlaskConical,
 } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
@@ -18,8 +16,7 @@ const navigationByRole = {
   ADMIN: [
     { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'User Management', to: '/admin/users', icon: UsersRound },
-    { label: 'Tests', to: '/admin/tests', icon: FlaskConical },
-    { label: 'Templates', to: '/admin/templates', icon: FileText },
+    { label: 'Test Directory', to: '/admin/tests', icon: FlaskConical },
     { label: 'Profile', to: '/profile', icon: UserCircle2 },
   ],
   RECEPTIONIST: [
@@ -38,137 +35,99 @@ const navigationByRole = {
 
 export function AppLayout() {
   const { user, logout } = useAuth()
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const items = navigationByRole[user?.role] ?? navigationByRole.PATIENT
+  const navigation = navigationByRole[user?.role] || []
+  const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase()
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.22),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(180deg,_#eff8ff_0%,_#f7fbff_45%,_#eaf2fb_100%)] text-slate-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col lg:flex-row">
-        <aside className="hidden w-full max-w-[300px] border-r border-white/40 bg-white/35 p-6 backdrop-blur-xl lg:flex lg:flex-col">
-          <Link to={getDashboardPath(user?.role)} className="flex items-center gap-3 text-slate-900">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-700 text-white shadow-lg shadow-sky-700/20">
-              <ShieldCheck className="h-5 w-5" />
+    <div className="flex h-screen bg-[#f3f7fa] font-sans text-slate-800">
+      
+      {/* Sidebar - Solid White with Thin Border */}
+      <aside className="hidden w-64 border-r border-slate-200/80 bg-white md:flex md:flex-col print:hidden shrink-0">
+        <div className="flex h-16 items-center border-b border-slate-200/80 px-6">
+          <Link to="/" className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow shadow-blue-600/10">
+              <Building2 className="h-4 w-4" />
             </span>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-700">LIS Module 1</p>
-              <h1 className="text-lg font-semibold">Laboratory Information System</h1>
-            </div>
+            <span className="text-base font-extrabold tracking-tight text-slate-900">LIS Laboratory</span>
           </Link>
-
-          <div className="mt-8 rounded-3xl border border-white/60 bg-white/70 p-5 shadow-lg shadow-slate-900/5">
-            <p className="text-sm font-medium text-slate-500">Signed in as</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-sm text-slate-500">{user?.role}</p>
-          </div>
-
-          <nav className="mt-8 space-y-2">
-            {items.map((item) => {
-              const Icon = item.icon
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    [
-                      'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition',
-                      isActive
-                        ? 'bg-sky-700 text-white shadow-lg shadow-sky-700/20'
-                        : 'text-slate-600 hover:bg-white/80 hover:text-slate-900',
-                    ].join(' ')
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </NavLink>
-              )
-            })}
-          </nav>
-
-          <div className="mt-auto rounded-3xl border border-white/70 bg-white/80 p-5 shadow-lg shadow-slate-900/5">
-            <p className="text-sm text-slate-500">Current role</p>
-            <p className="mt-1 text-base font-semibold text-slate-900">{user?.role}</p>
-          </div>
-        </aside>
-
-        <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/50 bg-white/65 backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((current) => !current)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm lg:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.32em] text-sky-700">Laboratory Information System</p>
-                  <p className="text-sm text-slate-500">{user?.role} workspace</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Link
-                  to={getDashboardPath(user?.role)}
-                  className="hidden rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 sm:inline-flex"
-                >
-                  <Building2 className="mr-2 h-4 w-4" />
-                  Dashboard
-                </Link>
-                <Link
-                  to="/profile"
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700"
-                >
-                  <UserCircle2 className="h-4 w-4" />
-                  {user?.firstName}
-                </Link>
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-900/20"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
-              </div>
-            </div>
-
-            {menuOpen ? (
-              <div className="border-t border-white/50 px-4 pb-4 sm:px-6 lg:hidden">
-                <div className="grid gap-2 pt-4 sm:grid-cols-2">
-                  {items.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setMenuOpen(false)}
-                        className={({ isActive }) =>
-                          [
-                            'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium',
-                            isActive ? 'bg-sky-700 text-white' : 'bg-white/80 text-slate-700',
-                          ].join(' ')
-                        }
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </NavLink>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : null}
-          </header>
-
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <div className="mx-auto w-full max-w-7xl">
-              <Outlet />
-            </div>
-          </main>
         </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 space-y-1 px-4 py-6">
+          {navigation.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`
+                }
+              >
+                <Icon className="h-4.5 w-4.5 shrink-0" />
+                {item.label}
+              </NavLink>
+            )
+          })}
+        </nav>
+
+        {/* User initials card in Sidebar Footer */}
+        <div className="border-t border-slate-200/85 p-4 bg-slate-50/50">
+          <div className="flex items-center gap-3 px-2 py-1.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700 border border-blue-100">
+              {initials || 'U'}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-extrabold text-slate-800">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="truncate text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{user?.role}</p>
+            </div>
+          </div>
+
+          <button
+            onClick={logout}
+            className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Panel Content Area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        
+        {/* Header - Solid White */}
+        <header className="flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-6 print:hidden">
+          <div className="flex items-center gap-4">
+            <button className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50 md:hidden transition">
+              <Menu className="h-4 w-4" />
+            </button>
+            <h1 className="text-sm font-bold text-slate-500 uppercase tracking-widest md:block hidden">
+              Clinical Workspace / <span className="text-slate-800 font-extrabold">{user?.role}</span>
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link to="/profile" className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700 border border-blue-100/50 md:hidden">
+                {initials || 'U'}
+              </span>
+            </Link>
+          </div>
+        </header>
+
+        {/* Scrollable View Area */}
+        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="mx-auto max-w-7xl">
+            <Outlet />
+          </div>
+        </main>
       </div>
     </div>
   )

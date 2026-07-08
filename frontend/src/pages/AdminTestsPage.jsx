@@ -1,20 +1,6 @@
-import { Edit3, FlaskConical, LoaderCircle, PlusCircle, Search, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { AdminBanner, AdminSpinner, AdminTextField } from '../components/admin/AdminUi.jsx'
+import { useEffect, useMemo, useState } from 'react'
+import { ClipboardPlus, LoaderCircle, Trash2, Edit, Search } from 'lucide-react'
 import { api } from '../lib/api.js'
-
-// Test catalogue management for creating and editing lab services.
-const emptyForm = {
-  testCode: '',
-  name: '',
-  category: 'Hematology',
-  price: '',
-  minRange: '',
-  maxRange: '',
-  unit: '',
-  description: '',
-  isActive: true,
-}
 
 export function AdminTestsPage() {
   const [tests, setTests] = useState([])
@@ -23,38 +9,36 @@ export function AdminTestsPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('ALL')
-  const [form, setForm] = useState(emptyForm)
-  const [editingId, setEditingId] = useState(null)
+  
+  // Form State
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState({ name: '', code: '', category: 'Biochemistry', price: '', reference_range: '', unit: '' })
 
   const loadTests = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/admin/tests')
-      setTests(response.data.tests || [])
+      const response = await api.get('/tests')
+      setTests(response.data.tests)
     } catch (loadError) {
-      setError(loadError?.response?.data?.message || 'Unable to load tests.')
+      setError(loadError?.response?.data?.message || 'Unable to load laboratory tests catalog.')
     } finally {
       setLoading(false)
     }
   }
 
-  const categories = useMemo(() => ['ALL', ...Array.from(new Set(tests.map((test) => test.category).filter(Boolean)))], [tests])
+  useEffect(() => {
+    void loadTests()
+  }, [])
 
   const filteredTests = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return tests.filter((test) => {
-      const matchesCategory = category === 'ALL' || test.category === category
-      const haystack = [test.name, test.testCode, test.category, test.description].join(' ').toLowerCase()
-      const matchesSearch = !query || haystack.includes(query)
-      return matchesCategory && matchesSearch
-    })
-  }, [category, search, tests])
+    if (!query) return tests
 
-  const resetForm = () => {
-    setForm(emptyForm)
-    setEditingId(null)
-  }
+    return tests.filter((test) => {
+      const searchable = [test.name, test.code, test.category].join(' ').toLowerCase()
+      return searchable.includes(query)
+    })
+  }, [search, tests])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -63,63 +47,47 @@ export function AdminTestsPage() {
     setMessage('')
 
     try {
-      const payload = {
-        testCode: form.testCode.trim(),
-        name: form.name.trim(),
-        category: form.category.trim(),
-        price: Number(form.price),
-        minRange: form.minRange === '' ? null : Number(form.minRange),
-        maxRange: form.maxRange === '' ? null : Number(form.maxRange),
-        unit: form.unit.trim(),
-        description: form.description.trim(),
-        isActive: form.isActive,
-      }
-
-      if (editingId) {
-        await api.put(`/admin/tests/${editingId}`, payload)
+      if (editId) {
+        await api.put(`/tests/${editId}`, form)
         setMessage('Test updated successfully.')
       } else {
-        await api.post('/admin/tests', payload)
+        await api.post('/tests', form)
         setMessage('Test created successfully.')
       }
-
-      resetForm()
+      setForm({ name: '', code: '', category: 'Biochemistry', price: '', reference_range: '', unit: '' })
+      setEditId(null)
       await loadTests()
     } catch (submitError) {
-      setError(submitError?.response?.data?.message || 'Unable to save test.')
+      setError(submitError?.response?.data?.message || 'Unable to save test configuration.')
     } finally {
       setSaving(false)
     }
   }
 
-  const startEdit = (test) => {
-    setEditingId(test.id)
+  const handleEdit = (test) => {
+    setEditId(test.id)
     setForm({
-      testCode: test.testCode,
       name: test.name,
-      category: test.category || 'Hematology',
+      code: test.code,
+      category: test.category,
       price: test.price,
-      minRange: test.minRange ?? '',
-      maxRange: test.maxRange ?? '',
-      unit: test.unit || '',
-      description: test.description || '',
-      isActive: test.isActive,
+      reference_range: test.reference_range,
+      unit: test.unit
     })
   }
 
-  const deleteTest = async (testId) => {
-    if (!window.confirm('Remove this test from the catalogue?')) return
-
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this test from the catalog?')) return
     setSaving(true)
     setError('')
     setMessage('')
 
     try {
-      await api.delete(`/admin/tests/${testId}`)
-      setMessage('Test removed successfully.')
+      await api.delete(`/tests/${id}`)
+      setMessage('Test deleted successfully.')
       await loadTests()
     } catch (deleteError) {
-      setError(deleteError?.response?.data?.message || 'Unable to remove test.')
+      setError(deleteError?.response?.data?.message || 'Unable to delete test.')
     } finally {
       setSaving(false)
     }
@@ -127,118 +95,147 @@ export function AdminTestsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      {/* Hero card */}
+      <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-sky-700">Test catalogue</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Create, edit, and manage laboratory tests</h2>
-            <p className="mt-3 max-w-3xl text-slate-600">Build a complete catalogue with pricing, reference ranges, and descriptive information for staff and reports.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-600">Lab Settings</p>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">Diagnostics Test Directory</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500 font-medium">
+              Manage the directory of active diagnostic tests, default reference ranges, measurement units, and pricing indexes.
+            </p>
           </div>
 
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-            <Search className="h-4 w-4 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tests" className="border-0 bg-transparent outline-none" />
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-150">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search test name or code" className="border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-350 font-medium" />
           </label>
         </div>
 
-        {message ? <AdminBanner tone="success" text={message} /> : null}
-        {error ? <AdminBanner tone="error" text={error} /> : null}
+        {message ? <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 font-medium">{message}</div> : null}
+        {error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 font-medium">{error}</div> : null}
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-              {editingId ? <Edit3 className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
-            </span>
-            <div>
-              <h3 className="text-xl font-semibold text-slate-900">{editingId ? 'Edit test' : 'Add test'}</h3>
-              <p className="text-sm text-slate-600">Store the test definition used by the laboratory team.</p>
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        {/* Left Col: Setup/Edit Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div className="space-y-4 font-semibold">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100 shadow-sm">
+                <ClipboardPlus className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">{editId ? 'Modify Test Parameters' : 'Add Test Setup'}</h3>
+                <p className="text-xs text-slate-500 font-medium">{editId ? 'Change reference parameters or pricing' : 'Create a new catalog diagnostic entry'}</p>
+              </div>
             </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="Test Name" value={form.name} onChange={(value) => setForm((c) => ({ ...c, name: value }))} placeholder="e.g. Fasting Blood Sugar" />
+              <TextField label="Short Code" value={form.code} onChange={(value) => setForm((c) => ({ ...c, code: value }))} placeholder="e.g. FBS" />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Test Category</span>
+                <select value={form.category} onChange={(e) => setForm((c) => ({ ...c, category: e.target.value }))} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm text-slate-900">
+                  <option value="Biochemistry">Biochemistry</option>
+                  <option value="Hematology">Hematology</option>
+                  <option value="Clinical Pathology">Clinical Pathology</option>
+                  <option value="Immunology">Immunology</option>
+                  <option value="Microbiology">Microbiology</option>
+                </select>
+              </label>
+              
+              <TextField label="Pricing (LKR)" type="number" value={form.price} onChange={(value) => setForm((c) => ({ ...c, price: value }))} placeholder="350.00" />
+            </div>
+
+            <TextField label="Reference Range Guidance" value={form.reference_range} onChange={(value) => setForm((c) => ({ ...c, reference_range: value }))} placeholder="e.g. 70 - 100" />
+            <TextField label="Measurement Unit" value={form.unit} onChange={(value) => setForm((c) => ({ ...c, unit: value }))} placeholder="e.g. mg/dL" />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <AdminTextField label="Test Code" value={form.testCode} onChange={(value) => setForm((current) => ({ ...current, testCode: value }))} placeholder="e.g. CBC01" />
-            <AdminTextField label="Test Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} placeholder="Complete Blood Count" />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">Category</span>
-              <input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
-            </label>
-            <AdminTextField label="Unit" value={form.unit} onChange={(value) => setForm((current) => ({ ...current, unit: value }))} placeholder="mg/dL" />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <AdminTextField label="Price" type="number" value={form.price} onChange={(value) => setForm((current) => ({ ...current, price: value }))} placeholder="0.00" />
-            <AdminTextField label="Min Range" type="number" value={form.minRange} onChange={(value) => setForm((current) => ({ ...current, minRange: value }))} placeholder="0" />
-            <AdminTextField label="Max Range" type="number" value={form.maxRange} onChange={(value) => setForm((current) => ({ ...current, maxRange: value }))} placeholder="100" />
-          </div>
-
-          <AdminTextField label="Description" textarea value={form.description} onChange={(value) => setForm((current) => ({ ...current, description: value }))} placeholder="Describe the purpose and notes for this test." />
-
-          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
-            Active in catalogue
-          </label>
-
-          <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 disabled:opacity-70">
-              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-              {editingId ? 'Update Test' : 'Create Test'}
+          <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
+            {editId && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setEditId(null)
+                  setForm({ name: '', code: '', category: 'Biochemistry', price: '', reference_range: '', unit: '' })
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+            )}
+            <button type="submit" disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-blue-700 transition">
+              {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
+              {editId ? 'Update Settings' : 'Add to Catalog'}
             </button>
-            <button type="button" onClick={resetForm} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700">Clear</button>
           </div>
         </form>
 
-        <section className="rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xl font-semibold text-slate-900">Catalogue entries</h3>
-              <p className="text-sm text-slate-600">Filter the list by category to focus on a specific specialty.</p>
-            </div>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100">
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item === 'ALL' ? 'All categories' : item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+        {/* Right Col: Catalog List Table */}
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold text-slate-900 border-b border-slate-100 pb-3">Active Catalog Directory</h3>
+          
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {loading ? (
-              <AdminSpinner text="Loading tests" />
+              <div className="flex items-center justify-center gap-3 p-12 text-slate-500">
+                <LoaderCircle className="h-6 w-6 animate-spin text-blue-600" /> Loading diagnostics catalog...
+              </div>
             ) : filteredTests.length ? (
               <div className="divide-y divide-slate-100">
                 {filteredTests.map((test) => (
-                  <div key={test.id} className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-slate-900">{test.name}</p>
-                        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">{test.testCode}</span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{test.category}</span>
+                  <div key={test.id} className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between group hover:bg-slate-50/50 transition">
+                    <div className="font-semibold">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block rounded-lg bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700 border border-blue-100/50 uppercase">
+                          {test.code}
+                        </span>
+                        <p className="font-bold text-slate-900 text-sm">{test.name}</p>
                       </div>
-                      <p className="mt-2 text-sm text-slate-600">{test.description || 'No description provided.'}</p>
-                      <p className="mt-2 text-sm text-slate-500">Price: {test.price} • Range: {test.minRange ?? '—'} / {test.maxRange ?? '—'} • Unit: {test.unit || '—'}</p>
+                      <p className="mt-1 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">{test.category}</p>
+                      <p className="mt-1 text-xs text-slate-500 font-medium">
+                        Range: <span className="font-bold text-slate-700">{test.reference_range}</span> {test.unit}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => startEdit(test)} className="rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">Edit</button>
-                      <button type="button" disabled={saving} onClick={() => deleteTest(test.id)} className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 disabled:opacity-60">
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
+
+                    <div className="flex items-center justify-between gap-4 md:justify-end font-semibold">
+                      <span className="text-sm font-extrabold text-slate-900">LKR {parseFloat(test.price).toFixed(2)}</span>
+                      <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition">
+                        <button type="button" onClick={() => handleEdit(test)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-650 transition">
+                          <Edit className="h-4.5 w-4.5" />
+                        </button>
+                        <button type="button" onClick={() => handleDelete(test.id)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-rose-600 transition">
+                          <Trash2 className="h-4.5 w-4.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-500">No tests match the current filters.</div>
+              <div className="p-12 text-center text-slate-500">No tests registered in catalog. Add tests on the left.</div>
             )}
           </div>
         </section>
       </div>
     </div>
+  )
+}
+
+function TextField({ label, value, onChange, placeholder, type = 'text' }) {
+  return (
+    <label className="block space-y-1.5 w-full font-semibold">
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <input 
+        type={type} 
+        value={value} 
+        onChange={(event) => onChange(event.target.value)} 
+        placeholder={placeholder}
+        required
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm text-slate-900 placeholder:text-slate-350 transition duration-150" 
+      />
+    </label>
   )
 }

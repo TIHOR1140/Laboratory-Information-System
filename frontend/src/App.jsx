@@ -7,10 +7,12 @@ import { LoginPage } from './pages/LoginPage.jsx'
 import { RegisterPage } from './pages/RegisterPage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
 import { ProfilePage } from './pages/ProfilePage.jsx'
+import { PatientPage } from './pages/PatientPage.jsx'
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
-import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx'
 import { AdminTestsPage } from './pages/AdminTestsPage.jsx'
-import { AdminTemplatesPage } from './pages/AdminTemplatesPage.jsx'
+import { ReceptionDashboardPage } from './pages/ReceptionDashboardPage.jsx'
+import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage.jsx'
+import { VerifyReportPage } from './pages/VerifyReportPage.jsx'
 import { NotFoundPage } from './pages/NotFoundPage.jsx'
 
 function App() {
@@ -18,6 +20,9 @@ function App() {
 
   return (
     <Routes>
+      {/* Public Verification Route */}
+      <Route path="/verify/:barcode" element={<VerifyReportPage />} />
+
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route
@@ -37,19 +42,13 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to={getDashboardPath(user?.role)} replace />} />
-          <Route path="/reception/dashboard" element={<DashboardPage role="RECEPTIONIST" />} />
-          <Route path="/lab/dashboard" element={<DashboardPage role="TECHNICIAN" />} />
-          <Route path="/patient/dashboard" element={<DashboardPage role="PATIENT" />} />
+          <Route path="/admin/dashboard" element={<DashboardPage role="ADMIN" />} />
+          <Route path="/reception/dashboard" element={<ReceptionDashboardPage />} />
+          <Route path="/lab/dashboard" element={<TechnicianDashboardPage />} />
+          <Route path="/patient/dashboard" element={<PatientPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-        </Route>
-      </Route>
-
-      <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-        <Route element={<AppLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/tests" element={<AdminTestsPage />} />
-          <Route path="/admin/templates" element={<AdminTemplatesPage />} />
         </Route>
       </Route>
 

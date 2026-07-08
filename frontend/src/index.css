@@ -5,9 +5,7 @@
   line-height: 1.5;
   font-weight: 400;
   color: #0f172a;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.9), rgba(240, 249, 255, 0.65)),
-    linear-gradient(180deg, #eff8ff 0%, #f7fbff 50%, #e8f1fb 100%);
+  background-color: #f3f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -42,7 +40,8 @@ textarea {
 }
 
 ::selection {
-  background: rgba(15, 118, 110, 0.18);
+  background: rgba(37, 99, 235, 0.15);
+  color: #1d4ed8;
 }
 
 input:focus,

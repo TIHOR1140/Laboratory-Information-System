@@ -159,10 +159,10 @@ npm run dev
 
 | Role         | Email                                             | Password    |
 | ------------ | ------------------------------------------------- | ----------- |
-| Admin        | [admin@lis.local](mailto:admin@lis.local)         | Admin@12345 |
-| Receptionist | [reception@lis.local](mailto:reception@lis.local) | Recep@12345 |
-| Technician   | [tech@lis.local](mailto:tech@lis.local)           | Tech@12345  |
-| Patient      | [patient1@lis.local](mailto:patient@lis.local)     | Patient1@123 |
+| Admin        | [admin@gmail.com](mailto:admin@gmail.com)         | Admin@123   |
+| Receptionist | [recep@gmail.com](mailto:recep@gmail.com)         | Recep@123   |
+| Technician   | [tech@gmail.com](mailto:tech@gmail.com)           | Tech@123    |
+| Patient      | [patient@gmail.com](mailto:patient@gmail.com)     | Patient@123 |
 
 > ⚠️ **Security Notice:** Change all default passwords immediately after first login.
 

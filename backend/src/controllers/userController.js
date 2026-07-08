@@ -26,8 +26,15 @@ async function createUser(req, res) {
   
   const name = [firstName, lastName].filter(Boolean).join(' ').trim()
 
-  if (!staffRoles.has(String(role || '').trim())) {
-    throw new HttpError(400, 'Only receptionist and technician accounts can be created here.')
+  const callerRole = req.auth.role
+  const targetRole = String(role || '').trim().toUpperCase()
+
+  const allowedRolesForCaller = callerRole === 'ADMIN'
+    ? ['ADMIN', 'RECEPTIONIST', 'TECHNICIAN', 'PATIENT']
+    : ['PATIENT']
+
+  if (!allowedRolesForCaller.includes(targetRole)) {
+    throw new HttpError(403, `You are not allowed to create users with the role ${targetRole}.`)
   }
 
   // Manual email normalization (since normalizeEmail may not exist)
@@ -99,8 +106,20 @@ async function updateStatus(req, res) {
   })
 }
 
+async function listAuditLogs(req, res) {
+  const result = await pool.query(`
+    SELECT a.*, u.name as user_name, u.email as user_email, u.role as user_role
+    FROM audit_logs a
+    LEFT JOIN users u ON a.user_id = u.id
+    ORDER BY a.created_at DESC
+    LIMIT 200
+  `)
+  return res.status(200).json({ logs: result.rows })
+}
+
 module.exports = {
   listUsers,
   createUser,
   updateStatus,
+  listAuditLogs,
 }
