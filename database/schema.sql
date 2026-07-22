@@ -170,3 +170,10 @@ CREATE TRIGGER set_invoices_updated_at
 BEFORE UPDATE ON invoices
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Two-Factor Authentication fields for users
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS two_factor_secret TEXT;
