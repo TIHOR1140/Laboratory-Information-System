@@ -1,7 +1,7 @@
 const express = require('express')
 const asyncHandler = require('../utils/asyncHandler')
 const { validateBody, required, minLength, email, phone, beforeToday, passwordStrength, oneOf } = require('../utils/validation')
-const { registerPatient, login, logout, setupTwoFactor, enableTwoFactor, verifyTwoFactorLogin } = require('../controllers/authController')
+const { registerPatient, login, logout } = require('../controllers/authController')
 const { authenticate } = require('../middleware/auth')
 
 const router = express.Router()
@@ -29,9 +29,5 @@ router.post(
 )
 
 router.post('/logout', authenticate, asyncHandler(logout))
-
-router.post('/2fa/setup', authenticate, asyncHandler(setupTwoFactor))
-router.post('/2fa/enable', authenticate, asyncHandler(enableTwoFactor))
-router.post('/2fa/verify', asyncHandler(verifyTwoFactorLogin))
 
 module.exports = router
