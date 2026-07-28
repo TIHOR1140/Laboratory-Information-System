@@ -13,11 +13,23 @@ function signToken(user, jti) {
   return jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn })
 }
 
+function signTempToken(user) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      twoFactor: true,
+    },
+    jwtSecret,
+    { expiresIn: '5m' },
+  )
+}
+
 function verifyToken(token) {
   return jwt.verify(token, jwtSecret)
 }
 
 module.exports = {
   signToken,
+  signTempToken,
   verifyToken,
 }

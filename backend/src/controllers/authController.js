@@ -2,9 +2,12 @@ const pool = require('../config/db')
 const HttpError = require('../utils/httpError')
 const { hashPassword, comparePassword } = require('../utils/password')
 const { signToken } = require('../utils/jwt')
+const { signTempToken, verifyToken } = require('../utils/jwt')
 const { logAudit } = require('../services/auditService')
 const { normalizeEmail } = require('../utils/validation')
 const { fullName, publicUser, publicProfile, splitName } = require('../utils/user')
+const { generateSecret, generateQRCodeDataURL, verifyTOTP } = require('../utils/twoFactor')
+const { sendOTPEmail } = require('../services/emailService')
 
 const crypto = require('crypto')
 
@@ -140,6 +143,38 @@ async function login(req, res) {
     throw new HttpError(401, 'Invalid credentials or inactive account.')
   }
 
+  // If user has 2FA enabled, return requirement mapping and trigger email OTP if selected
+  if (user.two_factor_enabled) {
+    const mfaMethod = user.two_factor_method || 'TOTP'
+    
+    if (mfaMethod === 'EMAIL') {
+      // Generate a 6-digit verification code
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+      await pool.query(
+        `
+          UPDATE users 
+          SET email_otp_code = $1, email_otp_expires_at = NOW() + INTERVAL '10 minutes' 
+          WHERE id = $2
+        `,
+        [otpCode, user.id]
+      )
+      
+      // Send email asynchronously so user doesn't wait
+      sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
+        console.error('Failed to send login 2FA OTP email:', err.message)
+      })
+    }
+
+    await pool.query('UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1', [user.id])
+    await logAudit(user.id, 'Login', `User ${fullName(user)} passed password check; 2FA (${mfaMethod}) required.`)
+
+    return res.status(200).json({
+      require2FA: true,
+      userId: user.id,
+      method: mfaMethod,
+    })
+  }
+
   await pool.query('UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1', [user.id])
   
   // Create session and get jti
@@ -151,6 +186,177 @@ async function login(req, res) {
     token: signToken(user, jti),
     user: publicUser(user),
   })
+}
+
+// Protected route: generate a new secret for the authenticated user to set up 2FA
+async function setupTwoFactor(req, res) {
+  const userId = req.auth.sub
+  const { method } = req.body
+  const targetMethod = String(method || 'TOTP').toUpperCase()
+
+  const result = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user) throw new HttpError(404, 'User not found')
+
+  const secret = await generateSecret({ name: user.name, email: user.email })
+  const qr = await generateQRCodeDataURL(secret.otpauth_url)
+
+  if (targetMethod === 'EMAIL') {
+    // Generate setup confirmation passcode
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+    await pool.query(
+      `
+        UPDATE users 
+        SET two_factor_secret = $1, email_otp_code = $2, email_otp_expires_at = NOW() + INTERVAL '10 minutes' 
+        WHERE id = $3
+      `,
+      [secret.base32, otpCode, userId]
+    )
+
+    // Send verification email
+    await sendOTPEmail(user.email, otpCode, user.name)
+  }
+
+  return res.status(200).json({
+    secret: secret.base32,
+    qrCodeDataUrl: qr,
+  })
+}
+
+// Protected route: enable 2FA after verifying a code from the authenticator app / email setup
+async function enableTwoFactor(req, res) {
+  const userId = req.auth.sub
+  const { secret, token, method } = req.body
+  const targetMethod = String(method || 'TOTP').toUpperCase()
+  if (!secret || !token) throw new HttpError(400, 'Missing secret or token')
+
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user) throw new HttpError(404, 'User not found')
+
+  if (targetMethod === 'EMAIL') {
+    if (!user.email_otp_code || !user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
+      throw new HttpError(400, 'Verification code has expired or is invalid.')
+    }
+    if (user.email_otp_code !== token) {
+      throw new HttpError(400, 'Invalid verification code.')
+    }
+    // Clear code and enable 2FA
+    await pool.query(
+      `
+        UPDATE users 
+        SET two_factor_enabled = TRUE, two_factor_secret = $1, two_factor_method = 'EMAIL', email_otp_code = NULL, email_otp_expires_at = NULL 
+        WHERE id = $2
+      `,
+      [secret, userId]
+    )
+  } else {
+    // TOTP (Authenticator App)
+    const ok = verifyTOTP(secret, token)
+    if (!ok) throw new HttpError(400, 'Invalid two-factor token')
+    await pool.query(
+      `
+        UPDATE users 
+        SET two_factor_enabled = TRUE, two_factor_secret = $1, two_factor_method = 'TOTP' 
+        WHERE id = $2
+      `,
+      [secret, userId]
+    )
+  }
+
+  await logAudit(userId, '2FA Enabled', `User enabled two-factor authentication via ${targetMethod}.`)
+
+  return res.status(200).json({ message: 'Two-factor authentication enabled.' })
+}
+
+// Protected route: disable 2FA
+async function disableTwoFactor(req, res) {
+  const userId = req.auth.sub
+  const { code } = req.body
+  if (!code) throw new HttpError(400, 'Missing two-factor verification code')
+
+  const result = await pool.query('SELECT two_factor_secret FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user || !user.two_factor_secret) {
+    throw new HttpError(400, '2FA is not currently enabled for this account')
+  }
+
+  const ok = verifyTOTP(user.two_factor_secret, code)
+  if (!ok) throw new HttpError(400, 'Invalid two-factor code')
+
+  await pool.query('UPDATE users SET two_factor_enabled = FALSE, two_factor_secret = NULL, two_factor_method = \'TOTP\' WHERE id = $1', [userId])
+  await logAudit(userId, '2FA Disabled', 'User disabled two-factor authentication.')
+
+  return res.status(200).json({ message: 'Two-factor authentication disabled.' })
+}
+
+// Public route: finalize login by verifying TOTP code / Email code from frontend
+async function verifyTwoFactorLogin(req, res) {
+  const { userId, code } = req.body
+  if (!userId || !code) throw new HttpError(400, 'Missing userId or code')
+
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user || !user.two_factor_enabled) {
+    throw new HttpError(401, 'Two-factor not configured for this account')
+  }
+
+  if (user.two_factor_method === 'EMAIL') {
+    if (!user.email_otp_code || !user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
+      throw new HttpError(401, 'Verification code has expired or is invalid.')
+    }
+    if (user.email_otp_code !== code) {
+      throw new HttpError(401, 'Invalid verification code.')
+    }
+    // Clear code after successful verification
+    await pool.query('UPDATE users SET email_otp_code = NULL, email_otp_expires_at = NULL WHERE id = $1', [user.id])
+  } else {
+    // TOTP
+    if (!user.two_factor_secret) {
+      throw new HttpError(401, 'Two-factor not configured for this account')
+    }
+    const ok = verifyTOTP(user.two_factor_secret, code)
+    if (!ok) throw new HttpError(401, 'Invalid two-factor token')
+  }
+
+  await pool.query('UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE id = $1', [user.id])
+  
+  // Create session and get jti
+  const jti = await createUserSession(user.id, req)
+
+  await logAudit(user.id, 'Login', `User ${fullName(user)} completed 2FA and signed in.`)
+
+  return res.status(200).json({
+    token: signToken(user, jti),
+    user: publicUser(user),
+  })
+}
+
+// Public route: resend 2FA Email OTP code
+async function resendTwoFactor(req, res) {
+  const { userId } = req.body
+  if (!userId) throw new HttpError(400, 'Missing user ID')
+
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user || !user.two_factor_enabled || user.two_factor_method !== 'EMAIL') {
+    throw new HttpError(400, 'Email 2FA is not configured for this account')
+  }
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+  await pool.query(
+    `
+      UPDATE users 
+      SET email_otp_code = $1, email_otp_expires_at = NOW() + INTERVAL '10 minutes' 
+      WHERE id = $2
+    `,
+    [otpCode, user.id]
+  )
+
+  await sendOTPEmail(user.email, otpCode, user.name)
+  await logAudit(user.id, '2FA Code Resent', 'Verification code resent via email.')
+
+  return res.status(200).json({ message: 'Verification code resent successfully.' })
 }
 
 async function logout(req, res) {
@@ -174,4 +380,9 @@ module.exports = {
   registerPatient,
   login,
   logout,
+  setupTwoFactor,
+  enableTwoFactor,
+  disableTwoFactor,
+  verifyTwoFactorLogin,
+  resendTwoFactor,
 }
