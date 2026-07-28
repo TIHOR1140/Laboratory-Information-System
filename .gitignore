@@ -19,3 +19,4 @@ backend/tmp/sent_emails.log
 .idea/
 .DS_Store
 Thumbs.db
+.agents/
