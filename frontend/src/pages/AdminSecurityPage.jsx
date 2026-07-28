@@ -116,30 +116,62 @@ export function AdminSecurityPage() {
             </div>
           </div>
 
+          {/* Concurrent login alert check */}
+          {(() => {
+            const counts = sessions.reduce((acc, s) => {
+              acc[s.userEmail] = (acc[s.userEmail] || 0) + 1
+              return acc
+            }, {})
+            const hasConcurrent = Object.values(counts).some(c => c >= 2)
+            
+            return hasConcurrent ? (
+              <div className="mb-4 rounded-2xl border border-amber-250/80 bg-amber-50/50 p-4 text-xs text-amber-850 dark:text-amber-400 font-semibold flex items-center gap-2.5 animate-pulse">
+                <AlertCircle className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+                <span><strong>Security Warning:</strong> Concurrent logins detected. One or more user accounts are currently authenticated on multiple devices.</span>
+              </div>
+            ) : null
+          })()}
+
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center gap-3 p-12 text-slate-500">
                 <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" /> Fetching active login keys...
               </div>
             ) : sessions.length > 0 ? (
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="pb-3 pl-2">User / Role</th>
-                    <th className="pb-3">IP Address</th>
-                    <th className="pb-3">Device / Browser</th>
-                    <th className="pb-3">Logged In</th>
-                    <th className="pb-3 pr-2 text-right">Revocation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sessions.map((session) => (
-                    <tr key={session.jti} className="hover:bg-slate-50/20 group">
-                      <td className="py-3.5 pl-2">
-                        <p className="font-extrabold text-slate-900">{session.userName}</p>
-                        <p className="text-slate-400 text-[10px]">{session.userEmail} • <span className="font-bold text-blue-600 dark:text-blue-400">{session.userRole}</span></p>
-                      </td>
-                      <td className="py-3.5 font-medium text-slate-650">{session.ipAddress || '127.0.0.1'}</td>
+              (() => {
+                const counts = sessions.reduce((acc, s) => {
+                  acc[s.userEmail] = (acc[s.userEmail] || 0) + 1
+                  return acc
+                }, {})
+
+                return (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                        <th className="pb-3 pl-2">User / Role</th>
+                        <th className="pb-3">IP Address</th>
+                        <th className="pb-3">Device / Browser</th>
+                        <th className="pb-3">Logged In</th>
+                        <th className="pb-3 pr-2 text-right">Revocation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sessions.map((session) => {
+                        const isConcurrent = counts[session.userEmail] >= 2
+                        return (
+                          <tr key={session.jti} className="hover:bg-slate-50/20 group">
+                            <td className="py-3.5 pl-2">
+                              <div className="flex items-center gap-2">
+                                <p className="font-extrabold text-slate-900">{session.userName}</p>
+                                {isConcurrent && (
+                                  <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded text-[9px] border border-amber-100 animate-pulse shrink-0">
+                                    Concurrent ({counts[session.userEmail]})
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-400 text-[10px]">{session.userEmail} • <span className="font-bold text-blue-600 dark:text-blue-400">{session.userRole}</span></p>
+                            </td>
+                            <td className="py-3.5 font-medium text-slate-650">{session.ipAddress || '127.0.0.1'}</td>
                       <td className="py-3.5 text-slate-500 font-medium" title={session.userAgent}>
                         {getReadableUA(session.userAgent)}
                       </td>
@@ -149,19 +181,22 @@ export function AdminSecurityPage() {
                           {new Date(session.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </p>
                       </td>
-                      <td className="py-3.5 pr-2 text-right">
-                        <button
-                          onClick={() => handleRevoke(session.jti)}
-                          className="inline-flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xxs font-extrabold px-3 py-2 border border-rose-150 transition cursor-pointer"
-                        >
-                          <UserX className="h-3.5 w-3.5" />
-                          Log Out
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <td className="py-3.5 pr-2 text-right">
+                          <button
+                            onClick={() => handleRevoke(session.jti)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xxs font-extrabold px-3 py-2 border border-rose-150 transition cursor-pointer"
+                          >
+                            <UserX className="h-3.5 w-3.5" />
+                            Log Out
+                          </button>
+                        </td>
+                      </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                )
+              })()
             ) : (
               <p className="p-12 text-center text-slate-500">No active sessions located.</p>
             )}
