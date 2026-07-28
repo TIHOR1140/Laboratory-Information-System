@@ -184,6 +184,67 @@ async function updateTemplate(req, res) {
   return res.status(200).json({ template: mapTemplate(updated.rows[0]) })
 }
 
+async function listSessions(req, res) {
+  const result = await pool.query(
+    `
+      SELECT s.jti, s.ip_address, s.user_agent, s.expires_at, s.created_at, u.name, u.email, u.role
+      FROM user_sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.is_revoked = FALSE AND s.expires_at > NOW()
+      ORDER BY s.created_at DESC
+    `,
+  )
+  const sessions = result.rows.map(row => ({
+    jti: row.jti,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    userName: row.name,
+    userEmail: row.email,
+    userRole: row.role,
+  }))
+  return res.status(200).json({ sessions })
+}
+
+async function revokeSession(req, res) {
+  const { jti } = req.params
+  const result = await pool.query(
+    `UPDATE user_sessions SET is_revoked = TRUE WHERE jti = $1 RETURNING user_id`,
+    [jti],
+  )
+
+  if (result.rowCount === 0) {
+    throw new HttpError(404, 'Session not found or already revoked.')
+  }
+
+  await logAudit(req.auth?.sub || req.auth?.userId, 'Revoke User Session', `Revoked active session jti: ${jti} for user ${result.rows[0].user_id}`)
+
+  return res.status(200).json({ message: 'Session successfully revoked.' })
+}
+
+async function listAuditLogsFull(req, res) {
+  const result = await pool.query(
+    `
+      SELECT a.id, a.action, a.description, a.created_at, u.name, u.email, u.role
+      FROM audit_logs a
+      LEFT JOIN users u ON a.user_id = u.id
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `,
+  )
+  const logs = result.rows.map(row => ({
+    id: row.id,
+    action: row.action,
+    description: row.description,
+    createdAt: row.created_at,
+    userName: row.name || 'System / Guest',
+    userEmail: row.email || '',
+    userRole: row.role || 'SYSTEM',
+  }))
+  return res.status(200).json({ auditLogs: logs })
+}
+
 module.exports = {
   listActivity,
   listTests,
@@ -193,4 +254,7 @@ module.exports = {
   listTemplates,
   createTemplate,
   updateTemplate,
+  listSessions,
+  revokeSession,
+  listAuditLogsFull,
 }

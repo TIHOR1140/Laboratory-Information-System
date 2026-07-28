@@ -58,38 +58,38 @@ export function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4 text-slate-800">
+      <form onSubmit={handleSubmit} className="space-y-4 text-slate-800 dark:text-slate-100">
         <label className="block space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Full Name</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Full Name</span>
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
             placeholder="e.g. John Doe"
             required
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-350 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+            className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-450 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
           />
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date of Birth</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date of Birth</span>
             <input
               type="date"
               value={form.dateOfBirth}
               onChange={(e) => setForm((c) => ({ ...c, dateOfBirth: e.target.value }))}
               required
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
             />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Gender</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Gender</span>
             <select
               value={form.gender}
               onChange={(e) => setForm((c) => ({ ...c, gender: e.target.value }))}
               required
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
             >
               <option value="Male">Male</option>
               <option value="Female">Female</option>
@@ -99,49 +99,49 @@ export function RegisterPage() {
         </div>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email Address</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Email Address</span>
           <input
             type="email"
             value={form.email}
             onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))}
             placeholder="john@example.com"
             required
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-350 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+            className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-450 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
           />
         </label>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Phone Number</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Phone Number</span>
           <input
             type="text"
             value={form.phone}
             onChange={(e) => setForm((c) => ({ ...c, phone: e.target.value }))}
             placeholder="07xxxxxxxx"
             required
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-350 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+            className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-450 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
           />
         </label>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Password</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Password</span>
           <input
             type="password"
             value={form.password}
             onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
             placeholder="••••••••"
             required
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-350 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition duration-150"
+            className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-450 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
           />
-          <span className="text-[10px] text-slate-400 block mt-1 tracking-tight">At least 8 characters, containing uppercase, lowercase, and a number.</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-1 tracking-tight">At least 8 characters, containing uppercase, lowercase, and a number.</span>
         </label>
 
         {/* Strength indicator */}
         {form.password && (
           <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-xxs font-bold uppercase tracking-wider text-slate-400">
-              <span>Strength: <span className="font-extrabold text-slate-700">{strengthText}</span></span>
+            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span>Strength: <span className="font-extrabold text-slate-700 dark:text-slate-350">{strengthText}</span></span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 border">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950 border dark:border-slate-800">
               <div className={`h-full ${strengthColor} transition-all duration-200`} style={{ width: `${(strength / 4) * 100}%` }} />
             </div>
           </div>
@@ -150,7 +150,7 @@ export function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 hover:bg-blue-700 transition"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 hover:bg-blue-700 transition cursor-pointer"
         >
           {loading ? <LoaderCircle className="h-4 w-4 animate-spin text-white" /> : <UserPlus className="h-4.5 w-4.5" />}
           Register Patient Profile
@@ -158,14 +158,14 @@ export function RegisterPage() {
       </form>
 
       <div className="my-4 flex items-center justify-between gap-3">
-        <span className="h-[1px] flex-1 bg-slate-200" />
+        <span className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800" />
         <span className="text-xs font-semibold text-slate-400">Already registered?</span>
-        <span className="h-[1px] flex-1 bg-slate-200" />
+        <span className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800" />
       </div>
 
-      <p className="text-center text-sm text-slate-600 font-medium">
+      <p className="text-center text-sm text-slate-600 dark:text-slate-400 font-medium">
         Back to portal sign in?{' '}
-        <Link to="/login" className="font-extrabold text-blue-600 hover:text-blue-750 transition flex items-center justify-center gap-1 mt-1">
+        <Link to="/login" className="font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-750 transition flex items-center justify-center gap-1 mt-1">
           Sign In Now
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>

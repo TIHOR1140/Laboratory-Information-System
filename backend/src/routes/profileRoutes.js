@@ -2,11 +2,22 @@ const express = require('express')
 const asyncHandler = require('../utils/asyncHandler')
 const { validateBody, optional, minLength, required, passwordStrength, matchesField } = require('../utils/validation')
 const { authenticate } = require('../middleware/auth')
-const { getProfile, updateProfile, changePassword } = require('../controllers/profileController')
+const { getProfile, updateProfile, changePassword, getActiveSessions, revokeSession } = require('../controllers/profileController')
 
 const router = express.Router()
 
 router.get('/', authenticate, asyncHandler(getProfile))
+
+router.get('/sessions', authenticate, asyncHandler(getActiveSessions))
+
+router.post(
+  '/sessions/revoke',
+  authenticate,
+  validateBody({
+    jti: [required('Session ID')],
+  }),
+  asyncHandler(revokeSession),
+)
 
 router.put(
   '/',

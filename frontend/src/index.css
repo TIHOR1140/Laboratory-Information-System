@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@variant dark (&:where(.dark, .dark *));
 
 :root {
   font-family: Inter, 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -54,3 +55,125 @@ input:focus-visible,
 select:focus-visible {
   outline: none;
 }
+
+/* ==========================================================================
+   🌙 Comprehensive Global Dark Mode Theme Overrides
+   ========================================================================== */
+.dark {
+  color-scheme: dark;
+}
+
+.dark html,
+.dark body,
+.dark #root {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+}
+
+/* Component Backgrounds */
+.dark .bg-white,
+.dark .bg-white\/80 {
+  background-color: #111827 !important; /* slate-900 */
+}
+.dark .bg-\[\#f3f7fa\] {
+  background-color: #0b0f19 !important; /* dark canvas */
+}
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-100 {
+  background-color: #1f2937 !important; /* slate-800 */
+}
+.dark .bg-slate-50\/20:hover,
+.dark .hover\:bg-slate-50:hover {
+  background-color: rgba(31, 41, 55, 0.6) !important;
+}
+
+/* Text Colors */
+.dark .text-slate-900,
+.dark .text-slate-850,
+.dark .text-slate-800 {
+  color: #f9fafb !important; /* slate-50 */
+}
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-450,
+.dark .text-slate-400 {
+  color: #9ca3af !important; /* slate-400 */
+}
+
+/* Border Rules */
+.dark .border-slate-200,
+.dark .border-slate-200\/80,
+.dark .border-slate-200\/85,
+.dark .border-slate-100,
+.dark .border-slate-150 {
+  border-color: #1f2937 !important; /* slate-800 */
+}
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1f2937 !important;
+}
+
+/* Form Inputs, Selects, & Placeholders */
+.dark input,
+.dark select,
+.dark textarea {
+  color: #f9fafb !important;
+}
+.dark input::placeholder {
+  color: #4b5563 !important;
+}
+.dark select option {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+/* System Accent Badges & Highlights */
+.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+.dark .text-blue-700,
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+.dark .border-blue-100 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+.dark .text-emerald-700,
+.dark .text-emerald-600 {
+  color: #34d399 !important;
+}
+.dark .border-emerald-100 {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.dark .bg-rose-50 {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+}
+.dark .text-rose-700,
+.dark .text-rose-600 {
+  color: #f87171 !important;
+}
+.dark .border-rose-100 {
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+.dark .text-amber-700,
+.dark .text-amber-600 {
+  color: #fbbf24 !important;
+}
+.dark .border-amber-100 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Overlay and Modals */
+.dark .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+

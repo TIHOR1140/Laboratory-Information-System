@@ -27,6 +27,8 @@ function publicUser(user) {
     isActive: user.is_active,
     lastLogin: user.last_login || null,
     phone: user.phone || null,
+    twoFactorEnabled: user.two_factor_enabled ?? false,
+    twoFactorMethod: user.two_factor_method || 'TOTP',
   }
 }
 

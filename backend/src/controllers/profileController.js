@@ -6,7 +6,7 @@ const { publicUser, publicProfile } = require('../utils/user')
 
 async function getProfile(req, res) {
   const userResult = await pool.query(
-    'SELECT id, name, email, role, is_active, last_login, created_at, updated_at FROM users WHERE id = $1',
+    'SELECT id, name, email, role, is_active, last_login, two_factor_enabled, two_factor_method, created_at, updated_at FROM users WHERE id = $1',
     [req.auth.sub],
   )
   const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [req.auth.sub])
@@ -48,7 +48,7 @@ async function updateProfile(req, res) {
         SET name = COALESCE($1, name),
             updated_at = NOW()
         WHERE id = $2
-        RETURNING id, name, email, role, is_active, last_login, created_at, updated_at
+        RETURNING id, name, email, role, is_active, last_login, two_factor_enabled, two_factor_method, created_at, updated_at
       `,
       [nameFromFields || null, req.auth.sub],
     )
@@ -146,13 +146,62 @@ async function changePassword(req, res) {
   const nextHash = await hashPassword(newPassword)
   await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [nextHash, req.auth.sub])
 
-  await logAudit(req.auth.sub, 'Password Change', 'User changed their password.')
+  // Revoke all other active sessions for this user on password change
+  await pool.query(
+    'UPDATE user_sessions SET is_revoked = TRUE, updated_at = NOW() WHERE user_id = $1 AND jti <> $2',
+    [req.auth.sub, req.auth.jti || '']
+  )
 
-  return res.status(200).json({ message: 'Password updated successfully.' })
+  await logAudit(req.auth.sub, 'Password Change', 'User changed their password and invalidated other sessions.')
+
+  return res.status(200).json({ message: 'Password updated successfully. Other active sessions have been signed out.' })
+}
+
+async function getActiveSessions(req, res) {
+  const userId = req.auth.sub
+  const result = await pool.query(
+    `SELECT jti, ip_address, user_agent, created_at, updated_at 
+     FROM user_sessions 
+     WHERE user_id = $1 AND is_revoked = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC`,
+    [userId]
+  )
+
+  return res.status(200).json({
+    sessions: result.rows.map((row) => ({
+      jti: row.jti,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      isCurrent: row.jti === req.auth.jti,
+    })),
+  })
+}
+
+async function revokeSession(req, res) {
+  const userId = req.auth.sub
+  const { jti } = req.body
+  if (!jti) throw new HttpError(400, 'Missing session ID')
+
+  // Check if session belongs to the current user
+  const check = await pool.query('SELECT user_id FROM user_sessions WHERE jti = $1', [jti])
+  const session = check.rows[0]
+  if (!session) throw new HttpError(404, 'Session not found')
+  if (session.user_id !== userId) {
+    throw new HttpError(403, 'You do not have permission to revoke this session')
+  }
+
+  await pool.query('UPDATE user_sessions SET is_revoked = TRUE, updated_at = NOW() WHERE jti = $1', [jti])
+  await logAudit(userId, 'Session Revoked', `User revoked session ID ${jti}`)
+
+  return res.status(200).json({ message: 'Session revoked successfully.' })
 }
 
 module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  getActiveSessions,
+  revokeSession,
 }

@@ -16,6 +16,15 @@ export function AuthProvider({ children }) {
 
   const login = async ({ email, password, rememberMe }) => {
     const response = await api.post('/auth/login', { email, password })
+    if (response.data.require2FA) {
+      return response.data
+    }
+    persistSession(response.data, rememberMe)
+    return response.data
+  }
+
+  const verify2FALogin = async ({ userId, code, rememberMe }) => {
+    const response = await api.post('/auth/verify-2fa', { userId, code })
     persistSession(response.data, rememberMe)
     return response.data
   }
@@ -64,6 +73,7 @@ export function AuthProvider({ children }) {
     refreshProfile,
     updateProfile,
     changePassword,
+    verify2FALogin,
     getDashboardPath,
   }
 

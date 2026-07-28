@@ -13,8 +13,13 @@ import {
   AlertCircle,
   Printer,
   FileText,
+  Download,
 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import { api } from '../lib/api.js'
+
+import { socket } from '../lib/socket.js'
 
 export function PatientPage() {
   const [appointments, setAppointments] = useState([])
@@ -30,6 +35,7 @@ export function PatientPage() {
   const [activeReportAppt, setActiveReportAppt] = useState(null)
   const [reportResults, setReportResults] = useState([])
   const [loadingReport, setLoadingReport] = useState(false)
+  const [downloadingPDF, setDownloadingPDF] = useState(false)
 
   // Form State
   const [appointmentDate, setAppointmentDate] = useState('')
@@ -56,6 +62,17 @@ export function PatientPage() {
 
   useEffect(() => {
     void loadPageData()
+
+    // Listen for real-time status-update events (e.g. results submitted)
+    socket.on('status-update', (data) => {
+      console.log('⚡ WebSockets: Received update in Patient Dashboard:', data)
+      // Silently refresh dashboard list
+      void loadPageData()
+    })
+
+    return () => {
+      socket.off('status-update')
+    }
   }, [])
 
   const handleBookAppointment = async (e) => {
@@ -134,6 +151,182 @@ export function PatientPage() {
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!activeReportAppt) return
+    setDownloadingPDF(true)
+
+    try {
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      // Styling parameters
+      const margin = 20
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const contentWidth = pageWidth - 2 * margin
+      let y = 25
+
+      // Header branding
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(16)
+      pdf.setTextColor(15, 23, 42) // slate-900
+      pdf.text('LABORATORY INFORMATION SYSTEM (LIS)', pageWidth / 2, y, { align: 'center' })
+      
+      y += 6
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.setTextColor(37, 99, 235) // blue-600
+      pdf.text('MEDICAL DIAGNOSTICS CLINIC & LABORATORY SERVICES', pageWidth / 2, y, { align: 'center' })
+      
+      y += 5
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139) // slate-500
+      pdf.text('Colombo, Sri Lanka  |  Tel: +94 11 234 5678', pageWidth / 2, y, { align: 'center' })
+      
+      y += 8
+      // Draw horizontal line
+      pdf.setDrawColor(15, 23, 42)
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      y += 8
+      // Metadata Box (Draw a light gray rectangle)
+      pdf.setFillColor(248, 250, 252) // slate-50
+      pdf.setDrawColor(226, 232, 240) // slate-200
+      pdf.setLineWidth(0.2)
+      pdf.roundedRect(margin, y, contentWidth, 30, 3, 3, 'FD')
+
+      // Metadata Text
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.setTextColor(71, 85, 105) // slate-600
+      
+      const textYStart = y + 7
+      pdf.text('Patient Name:', margin + 6, textYStart)
+      pdf.text('Appointment:', margin + 6, textYStart + 7)
+      pdf.text('Barcode Sample:', margin + 6, textYStart + 14)
+
+      pdf.text('Report Code:', margin + 110, textYStart)
+      pdf.text('Status:', margin + 110, textYStart + 7)
+      pdf.text('Completion:', margin + 110, textYStart + 14)
+
+      // Values
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(15, 23, 42)
+      pdf.text(activeReportAppt.patient_name || 'Patient', margin + 35, textYStart)
+      pdf.text(formatDateTime(activeReportAppt.appointment_date), margin + 35, textYStart + 7)
+      pdf.text(activeReportAppt.barcode || 'N/A', margin + 35, textYStart + 14)
+
+      pdf.text(activeReportAppt.id.slice(0, 8).toUpperCase(), margin + 135, textYStart)
+      
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(16, 185, 129) // emerald-500
+      pdf.text('CERTIFIED', margin + 135, textYStart + 7)
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(15, 23, 42)
+      pdf.text(formatDateTime(activeReportAppt.updated_at), margin + 135, textYStart + 14)
+
+      y += 42
+      // Results Table Header
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(10)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('DIAGNOSTIC PANELS', margin, y)
+
+      y += 6
+      pdf.setDrawColor(203, 213, 225) // slate-300
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      y += 6
+      pdf.setFontSize(8.5)
+      pdf.text('Test Parameter', margin + 2, y)
+      pdf.text('Observed Value', margin + 60, y)
+      pdf.text('Reference Range', margin + 100, y)
+      pdf.text('Measurement Unit', margin + 145, y)
+
+      y += 4
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      // Table Rows
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(51, 65, 85) // slate-700
+      
+      for (const res of reportResults) {
+        y += 8
+        // Parameter name & code
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(15, 23, 42)
+        pdf.text(res.test_name, margin + 2, y)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7)
+        pdf.setTextColor(148, 163, 184)
+        pdf.text(res.test_code.toUpperCase(), margin + 2, y + 4)
+
+        // Observed Value
+        pdf.setFontSize(8.5)
+        if (res.is_normal) {
+          pdf.setTextColor(15, 23, 42)
+          pdf.text(String(res.result_value), margin + 60, y + 2)
+        } else {
+          pdf.setTextColor(225, 29, 72) // rose-600
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(`${res.result_value}  (ABNORMAL)`, margin + 60, y + 2)
+          pdf.setFont('helvetica', 'normal')
+        }
+
+        // Reference & Unit
+        pdf.setTextColor(71, 85, 105)
+        pdf.text(res.reference_range, margin + 100, y + 2)
+        pdf.text(res.unit, margin + 145, y + 2)
+
+        y += 4
+        // Row divider
+        pdf.setDrawColor(241, 245, 249) // slate-100
+        pdf.line(margin, y + 2, pageWidth - margin, y + 2)
+        y += 2
+      }
+
+      y += 20
+      // Doctor/Staff Sign-off Section
+      pdf.setDrawColor(203, 213, 225)
+      pdf.line(margin, y, margin + 60, y)
+      
+      y += 5
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8.5)
+      pdf.setTextColor(71, 85, 105)
+      pdf.text('Laboratory Technologist Signature', margin, y)
+      
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(148, 163, 184)
+      y += 4
+      pdf.text('LIS Certified Officer (Electronic Sign-off)', margin, y)
+
+      // Right Column: Electronic Verification Info
+      const rightX = margin + 100
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(71, 85, 105)
+      pdf.text('Report Generated Electronically', rightX, y - 9)
+      
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(148, 163, 184)
+      pdf.setFontSize(7)
+      pdf.text('This is an authentic system generated medical report.', rightX, y - 5)
+      pdf.text(`Verify online using Barcode Reference: ${activeReportAppt.barcode || 'N/A'}`, rightX, y - 1)
+
+      pdf.save(`LIS_Report_${activeReportAppt.barcode || activeReportAppt.id.slice(0, 8)}.pdf`)
+    } catch (err) {
+      console.error('PDF generation error:', err)
+      alert('Could not download PDF. Please try printing or use another browser.')
+    } finally {
+      setDownloadingPDF(false)
+    }
   }
 
   const toggleTestSelection = (testId) => {
@@ -511,12 +704,24 @@ export function PatientPage() {
                 <FileText className="h-5 w-5 text-blue-600" />
                 Laboratory Diagnostics Report
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={downloadingPDF || loadingReport}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-700 shadow disabled:opacity-50 transition"
+                >
+                  {downloadingPDF ? (
+                    <LoaderCircle className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="h-3 w-3" />
+                  )}
+                  {downloadingPDF ? 'Downloading...' : 'Download PDF'}
+                </button>
                 <button
                   onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-[10px] font-bold text-white shadow transition"
                 >
-                  <Printer className="h-3.5 w-3.5" />
+                  <Printer className="h-3 w-3" />
                   Print Report
                 </button>
                 <button
@@ -524,9 +729,9 @@ export function PatientPage() {
                     setActiveReportAppt(null)
                     setReportResults([])
                   }}
-                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4.5 w-4.5" />
                 </button>
               </div>
             </div>
@@ -538,7 +743,7 @@ export function PatientPage() {
                   <LoaderCircle className="h-6 w-6 animate-spin text-blue-600" /> Loading results sheet...
                 </div>
               ) : (
-                <div className="space-y-6 print:space-y-8 font-sans">
+                <div id="printable-report-content" className="space-y-6 print:space-y-8 font-sans p-4">
                   {/* Clinic Logo/Branding Header */}
                   <div className="text-center pb-4 border-b-2 border-slate-900">
                     <h2 className="text-2xl font-extrabold uppercase tracking-widest text-slate-900">Laboratory Information System (LIS)</h2>
@@ -612,6 +817,7 @@ export function PatientPage() {
                         <div className="bg-white p-1 border border-slate-200 rounded-lg flex flex-col items-center shadow-xs">
                           <img
                             alt="Verification QR"
+                            crossOrigin="anonymous"
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`http://localhost:5173/verify/${activeReportAppt.barcode}`)}`}
                             className="w-14 h-14 object-contain"
                           />

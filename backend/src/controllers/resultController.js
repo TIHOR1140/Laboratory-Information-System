@@ -78,6 +78,18 @@ async function submitResults(req, res) {
 
     await logAudit(userId, 'Submit Test Results', `Submitted ${results.length} test results for appointment ${appointmentId} and completed tests`)
 
+    // Broadcast real-time status update to all connected clients
+    try {
+      const socketService = require('../services/socketService')
+      socketService.broadcast('status-update', {
+        appointmentId,
+        status: 'COMPLETED',
+        message: 'New test results submitted!'
+      })
+    } catch (socketErr) {
+      console.error('Failed to broadcast status update:', socketErr.message)
+    }
+
     res.status(200).json({ message: 'Results submitted successfully and appointment marked as completed.' })
   } catch (error) {
     await client.query('ROLLBACK')

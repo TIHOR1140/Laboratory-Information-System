@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 import { api } from '../lib/api.js'
 
+import { socket } from '../lib/socket.js'
+
 export function ReceptionDashboardPage() {
   const [appointments, setAppointments] = useState([])
   const [patients, setPatients] = useState([])
@@ -65,6 +67,17 @@ export function ReceptionDashboardPage() {
 
   useEffect(() => {
     void loadData()
+
+    // Listen for real-time status-update events (e.g. results submitted)
+    socket.on('status-update', (data) => {
+      console.log('⚡ WebSockets: Received update in Receptionist Dashboard:', data)
+      // Silently refresh appointments
+      void loadData()
+    })
+
+    return () => {
+      socket.off('status-update')
+    }
   }, [])
 
   // Filters

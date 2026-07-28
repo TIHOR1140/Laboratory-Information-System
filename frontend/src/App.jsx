@@ -10,6 +10,7 @@ import { ProfilePage } from './pages/ProfilePage.jsx'
 import { PatientPage } from './pages/PatientPage.jsx'
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx'
 import { AdminTestsPage } from './pages/AdminTestsPage.jsx'
+import { AdminSecurityPage } from './pages/AdminSecurityPage.jsx'
 import { ReceptionDashboardPage } from './pages/ReceptionDashboardPage.jsx'
 import { TechnicianDashboardPage } from './pages/TechnicianDashboardPage.jsx'
 import { VerifyReportPage } from './pages/VerifyReportPage.jsx'
@@ -49,6 +50,7 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/tests" element={<AdminTestsPage />} />
+          <Route path="/admin/security" element={<AdminSecurityPage />} />
         </Route>
       </Route>
 
