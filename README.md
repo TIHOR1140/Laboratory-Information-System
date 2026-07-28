@@ -1,221 +1,128 @@
-# Laboratory Information System
+# Laboratory Information System (LIS)
 
-A modern, secure, and role-based **Laboratory Information System (LIS)** built for efficient management of clinical laboratory operations.
+A modern, secure, and role-based **Laboratory Information System (LIS)** built for efficient management of clinical laboratory operations, test directories, and patient reporting.
 
 ---
 
-## ✨ Features
+## ✨ Key Features & Enhancements
 
-* 🔐 Secure Authentication using JWT
-* 👥 Role-Based Access Control (Admin, Receptionist, Technician, Patient)
-* 🧑‍⚕️ Patient Registration & Management
-* 🧪 Laboratory Test Ordering
-* 📋 Test Result Management
-* 📊 Dashboard & Reporting
-* 📱 Responsive and Modern User Interface
-* 🗄️ PostgreSQL Database Integration
-* ⚡ Full-Stack Architecture (React + Node.js + Express)
+* 🔐 **Secure Authentication**: JWT-based authorization and backend verification.
+* 👥 **Role-Based Access Control**: Structured layouts for Admins, Receptionists, Technicians, and Patients.
+* ⚡ **Real-Time Status Updates (WebSockets)**: Uses **Socket.io** to synchronize technician test submissions with receptionist screens and patient tables instantly.
+* 🌙 **Persistent Dark Mode Toggle**: Responsive Sun/Moon header toggle with `localStorage` selection, utilizing Tailwind CSS variants.
+* 🛡️ **Security & Session Control**: Admin command center to audit active user sessions (logins, IP addresses, browser strings) and trigger immediate remote session revocation.
+* 📊 **Live Activity Logs**: Comprehensive audit trail browser showing system-wide database logs and operator credentials.
+* 📋 **Diagnostic Reports**: Dynamic PDF reports compilation and barcode generation/scanning.
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-
 * React.js
 * Vite
 * Tailwind CSS
+* Lucide React Icons
+* Socket.io-client
 
 ### Backend
-
 * Node.js
 * Express.js
+* Socket.io
+* Speakeasy (2FA integration ready)
+* Nodemail / SMTP
 
 ### Database
-
 * PostgreSQL
-
-### Authentication & Security
-
-* JWT (JSON Web Tokens)
-* bcrypt
-
-### Additional Packages
-
-* dotenv
-* pg
-* cors
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-Ensure the following are installed on your system:
-
 * Node.js (v18 or later)
-* PostgreSQL
-* Git
+* PostgreSQL database instance running locally
 
 ---
 
-## 1️⃣ Clone the Repository
+## 1️⃣ Database Setup & Automated Migrations
+
+Ensure PostgreSQL is running. We have built an automated setup utility:
+1. Configure credentials inside your `.env` (see backend configuration below).
+2. From the project root, run:
 
 ```bash
-git clone https://github.com/TIHOR1140/GPSD-LIS.git
-cd GPSD-LIS
+cd backend
+npm run db:setup
 ```
+This script handles database verification, migration schema setup, and user seeding automatically!
 
 ---
 
-## 2️⃣ Database Setup
+## 2️⃣ Backend Configuration
 
-Create the database:
-
-```bash
-psql -U postgres -c "CREATE DATABASE lis_db;"
-```
-
-Run the database schema:
-
-```bash
-psql -U postgres -d lis_db -f database/schema.sql
-```
-
-Seed the database with default users:
-
-```bash
-psql -U postgres -d lis_db -f database/seed.sql
-```
-
----
-
-## 3️⃣ Backend Setup
-
-Navigate to the backend directory:
-
+Navigate to the `backend/` directory:
 ```bash
 cd backend
 ```
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Create an environment file:
-
-```bash
-cp .env.example .env
-```
-
-Update the `.env` file:
-
+Create a `.env` file (based on `.env.example`) containing:
 ```env
-PORT=4000
+PORT=5000
 CLIENT_URL=http://localhost:5173
 
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
+# Local PostgreSQL Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=lis_db
+DB_USER=postgres
+DB_PASSWORD=YOUR_POSTGRES_PASSWORD
+DATABASE_URL=postgresql://postgres:YOUR_POSTGRES_PASSWORD@localhost:5432/lis_db
 
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/lis_db
-
+# Security & Tokens
+JWT_SECRET=YOUR_JWT_SECRET_KEY_MIN_32_CHARS
+JWT_EXPIRES_IN=8h
 BCRYPT_ROUNDS=12
+
+# Gmail SMTP Email Server Config
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_FROM=your-email@gmail.com
 ```
-* As psw I have used rohit2004 
 
-Start the backend server:
-
+Start the backend server in development mode:
 ```bash
 npm run dev
 ```
+*(The API will start listening on port 5000).*
 
 ---
 
-## 4️⃣ Frontend Setup
+## 3️⃣ Frontend Configuration
 
-Open a new terminal and navigate to the frontend directory:
-
+Open a new terminal window and navigate to the `frontend/` directory:
 ```bash
 cd frontend
 ```
 
-Install dependencies:
-
+Install modules and run the Vite client:
 ```bash
 npm install
-```
-
-Run the development server:
-
-```bash
 npm run dev
 ```
+*(Vite client runs on `http://localhost:5173` and proxies `/api` to port 5000).*
 
 ---
 
 ## 🔑 Default Login Credentials
 
-| Role         | Email                                             | Password    |
-| ------------ | ------------------------------------------------- | ----------- |
-| Admin        | [admin@gmail.com](mailto:admin@gmail.com)         | Admin@123   |
-| Receptionist | [recep@gmail.com](mailto:recep@gmail.com)         | Recep@123   |
-| Technician   | [tech@gmail.com](mailto:tech@gmail.com)           | Tech@123    |
-| Patient      | [patient@gmail.com](mailto:patient@gmail.com)     | Patient@123 |
+| Role         | Email              | Password    |
+| ------------ | ------------------ | ----------- |
+| Admin        | admin@gmail.com    | Admin@123   |
+| Receptionist | recep@gmail.com    | Recep@123   |
+| Technician   | tech@gmail.com     | Tech@123    |
+| Patient      | patient@gmail.com  | Patient@123 |
 
-> ⚠️ **Security Notice:** Change all default passwords immediately after first login.
-
----
-
-## 📁 Project Structure
-
-```text
-GPSD-LIS/
-│
-├── backend/          # Node.js + Express API
-├── frontend/         # React.js Frontend
-├── database/         # SQL Schema & Seed Files
-├── docs/             # Project Documentation
-└── README.md
-```
-
----
-
-## 🧪 How to Test
-
-1. Start PostgreSQL.
-2. Run the backend server:
-
-```bash
-cd backend
-npm run dev
-```
-
-3. Run the frontend application:
-
-```bash
-cd frontend
-npm run dev
-```
-
-4. Open your browser and navigate to:
-
-```text
-http://localhost:5173
-```
-
-5. Login using one of the default accounts provided above.
-
----
-
-## 🔒 Security Features
-
-* Password hashing using bcrypt
-* JWT-based authentication
-* Protected API routes
-* Role-based authorization
-* Environment variable configuration
-* Secure database access
-
----
+> ⚠️ **Security Notice:** Change default credentials immediately upon production deployments.
