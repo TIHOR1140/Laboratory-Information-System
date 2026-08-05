@@ -153,9 +153,11 @@ export function ProfilePage() {
     setMfaSuccess('')
     try {
       const response = await api.post('/auth/setup-2fa', { method: mfaMethod })
+      if (response.data?.secret) {
+        setTotpSecret(response.data.secret)
+      }
       if (mfaMethod === 'TOTP') {
         setQrCode(response.data.qrCodeDataUrl)
-        setTotpSecret(response.data.secret)
       }
       setMfaSetup(true)
       setMfaCode('')
@@ -171,7 +173,12 @@ export function ProfilePage() {
     setMfaError('')
     setMfaSuccess('')
     try {
-      const response = await api.post('/auth/confirm-2fa', { code: mfaCode, method: mfaMethod })
+      const response = await api.post('/auth/confirm-2fa', {
+        code: mfaCode,
+        token: mfaCode,
+        secret: totpSecret,
+        method: mfaMethod,
+      })
       setMfaSetup(false)
       setMfaCode('')
       setMfaSuccess(response.data.message || '2FA enabled successfully.')

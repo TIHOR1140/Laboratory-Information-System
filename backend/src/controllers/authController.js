@@ -226,13 +226,16 @@ async function setupTwoFactor(req, res) {
 // Protected route: enable 2FA after verifying a code from the authenticator app / email setup
 async function enableTwoFactor(req, res) {
   const userId = req.auth.sub
-  const { secret, token, method } = req.body
+  const { secret: bodySecret, token: bodyToken, code, method } = req.body
+  const token = bodyToken || code
   const targetMethod = String(method || 'TOTP').toUpperCase()
-  if (!secret || !token) throw new HttpError(400, 'Missing secret or token')
 
   const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
   const user = result.rows[0]
   if (!user) throw new HttpError(404, 'User not found')
+
+  const secret = bodySecret || user.two_factor_secret
+  if (!secret || !token) throw new HttpError(400, 'Missing secret or token')
 
   if (targetMethod === 'EMAIL') {
     if (!user.email_otp_code || !user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
