@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS two_factor_method VARCHAR(50);
+
 -- 2. User Profiles Table
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
