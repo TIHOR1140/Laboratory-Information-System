@@ -213,8 +213,10 @@ async function setupTwoFactor(req, res) {
       [secret.base32, otpCode, userId]
     )
 
-    // Send verification email
-    await sendOTPEmail(user.email, otpCode, user.name)
+    // Send verification email asynchronously so user doesn't wait
+    sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
+      console.error('Failed to send setup 2FA OTP email:', err.message)
+    })
   }
 
   return res.status(200).json({
@@ -272,22 +274,78 @@ async function enableTwoFactor(req, res) {
   return res.status(200).json({ message: 'Two-factor authentication enabled.' })
 }
 
+// Protected route: request a verification code to disable 2FA (for Email OTP)
+async function requestDisableTwoFactor(req, res) {
+  const userId = req.auth.sub
+
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
+  const user = result.rows[0]
+  if (!user || !user.two_factor_enabled) {
+    throw new HttpError(400, '2FA is not currently enabled for this account')
+  }
+
+  if (user.two_factor_method !== 'EMAIL') {
+    throw new HttpError(400, 'Email verification is not required for this 2FA method')
+  }
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+  await pool.query(
+    `
+      UPDATE users 
+      SET email_otp_code = $1, email_otp_expires_at = NOW() + INTERVAL '10 minutes' 
+      WHERE id = $2
+    `,
+    [otpCode, userId]
+  )
+
+  // Send verification email asynchronously so user doesn't wait
+  sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
+    console.error('Failed to send disable 2FA OTP email:', err.message)
+  })
+
+  return res.status(200).json({ message: 'A verification code has been sent to your email.' })
+}
+
 // Protected route: disable 2FA
 async function disableTwoFactor(req, res) {
   const userId = req.auth.sub
   const { code } = req.body
   if (!code) throw new HttpError(400, 'Missing two-factor verification code')
 
-  const result = await pool.query('SELECT two_factor_secret FROM users WHERE id = $1', [userId])
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId])
   const user = result.rows[0]
-  if (!user || !user.two_factor_secret) {
+  if (!user || !user.two_factor_enabled) {
     throw new HttpError(400, '2FA is not currently enabled for this account')
   }
 
-  const ok = verifyTOTP(user.two_factor_secret, code)
-  if (!ok) throw new HttpError(400, 'Invalid two-factor code')
+  if (user.two_factor_method === 'EMAIL') {
+    if (!user.email_otp_code || !user.email_otp_expires_at || new Date(user.email_otp_expires_at) < new Date()) {
+      throw new HttpError(400, 'Verification code has expired or is invalid.')
+    }
+    if (user.email_otp_code !== code) {
+      throw new HttpError(400, 'Invalid verification code.')
+    }
+  } else {
+    // TOTP
+    if (!user.two_factor_secret) {
+      throw new HttpError(400, '2FA is not currently enabled for this account')
+    }
+    const ok = verifyTOTP(user.two_factor_secret, code)
+    if (!ok) throw new HttpError(400, 'Invalid two-factor code')
+  }
 
-  await pool.query('UPDATE users SET two_factor_enabled = FALSE, two_factor_secret = NULL, two_factor_method = \'TOTP\' WHERE id = $1', [userId])
+  await pool.query(
+    `
+      UPDATE users 
+      SET two_factor_enabled = FALSE, 
+          two_factor_secret = NULL, 
+          two_factor_method = 'TOTP', 
+          email_otp_code = NULL, 
+          email_otp_expires_at = NULL 
+      WHERE id = $1
+    `,
+    [userId]
+  )
   await logAudit(userId, '2FA Disabled', 'User disabled two-factor authentication.')
 
   return res.status(200).json({ message: 'Two-factor authentication disabled.' })
@@ -356,7 +414,10 @@ async function resendTwoFactor(req, res) {
     [otpCode, user.id]
   )
 
-  await sendOTPEmail(user.email, otpCode, user.name)
+  // Send verification email asynchronously so user doesn't wait
+  sendOTPEmail(user.email, otpCode, user.name).catch((err) => {
+    console.error('Failed to resend 2FA OTP email:', err.message)
+  })
   await logAudit(user.id, '2FA Code Resent', 'Verification code resent via email.')
 
   return res.status(200).json({ message: 'Verification code resent successfully.' })
@@ -386,6 +447,7 @@ module.exports = {
   setupTwoFactor,
   enableTwoFactor,
   disableTwoFactor,
+  requestDisableTwoFactor,
   verifyTwoFactorLogin,
   resendTwoFactor,
 }

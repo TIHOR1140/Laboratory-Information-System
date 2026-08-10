@@ -51,6 +51,7 @@ export function ProfilePage() {
   const [mfaLoading, setMfaLoading] = useState(false)
   const [mfaError, setMfaError] = useState('')
   const [mfaSuccess, setMfaSuccess] = useState('')
+  const [sendingCode, setSendingCode] = useState(false)
 
   // Active Sessions states
   const [sessions, setSessions] = useState([])
@@ -206,6 +207,20 @@ export function ProfilePage() {
     }
   }
 
+  const handleRequestDisableCode = async () => {
+    setSendingCode(true)
+    setMfaError('')
+    setMfaSuccess('')
+    try {
+      const response = await api.post('/auth/request-disable-2fa')
+      setMfaSuccess(response.data.message || 'Verification code sent to your email.')
+    } catch (err) {
+      setMfaError(err?.response?.data?.message || 'Failed to send verification code. Please try again.')
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
   const handleRevokeSession = async (jti) => {
     try {
       await api.post('/profile/sessions/revoke', { jti })
@@ -318,6 +333,23 @@ export function ProfilePage() {
 
                 <div className="space-y-3 pt-2">
                   <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Disable 2FA</p>
+                  {user?.twoFactorMethod === 'EMAIL' && (
+                    <div className="flex flex-col gap-1.5 pb-1">
+                      <p className="text-xxs text-slate-500 font-medium leading-relaxed">
+                        To disable 2FA, please request a verification code sent to your email address: <strong>{user.email}</strong>.
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={handleRequestDisableCode}
+                          disabled={sendingCode}
+                          className="rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-600 transition disabled:opacity-75"
+                        >
+                          {sendingCode ? 'Sending...' : 'Send Verification Code'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <input
                       type="text"
