@@ -16,23 +16,28 @@ if (resendApiKey) {
   }
 }
 
-const smtpHost = process.env.SMTP_HOST
-const smtpPort = process.env.SMTP_PORT
+const smtpHost = process.env.SMTP_HOST || (process.env.SMTP_USER ? 'smtp.gmail.com' : null)
+const smtpPort = process.env.SMTP_PORT || 587
 const smtpUser = process.env.SMTP_USER
 const smtpPass = process.env.SMTP_PASS
-const smtpFrom = process.env.SMTP_FROM || 'no-reply@lis.local'
+const smtpFrom = process.env.SMTP_FROM || (smtpUser ? `LIS Workspace <${smtpUser}>` : 'no-reply@lis.local')
 
 let transporter
-if (smtpHost && !resendClient) {
-  transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(smtpPort) || 587,
-    secure: smtpPort == 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  })
+if (smtpUser && smtpPass) {
+  try {
+    transporter = nodemailer.createTransport({
+      host: smtpHost || 'smtp.gmail.com',
+      port: parseInt(smtpPort) || 587,
+      secure: smtpPort == 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    })
+    console.log('✔ SMTP Mail Transporter initialized successfully.')
+  } catch (err) {
+    console.error('Failed to initialize SMTP Transporter:', err.message)
+  }
 }
 
 async function sendOTPEmail(toEmail, code, userName) {
@@ -50,7 +55,24 @@ async function sendOTPEmail(toEmail, code, userName) {
     </div>
   `
 
-  // 1. Try Resend if configured
+  // 1. Try SMTP transporter if configured (Gmail / custom SMTP sends to any recipient)
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: toEmail,
+        subject: 'Your LIS 2-Step Verification Code',
+        text: `Your LIS 2-Step Verification Code is: ${code}. Valid for 10 minutes.`,
+        html: htmlContent,
+      })
+      console.log(`[SMTP] Verification email successfully sent to ${toEmail}`)
+      return
+    } catch (error) {
+      console.error('[SMTP] Failed to send mail, falling back:', error.message)
+    }
+  }
+
+  // 2. Try Resend if configured
   if (resendClient) {
     try {
       const response = await resendClient.emails.send({
@@ -66,23 +88,6 @@ async function sendOTPEmail(toEmail, code, userName) {
       return
     } catch (error) {
       console.error('[Resend] Failed to send email via Resend:', error.message)
-    }
-  }
-
-  // 2. Try SMTP transporter if configured
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: toEmail,
-        subject: 'Your LIS 2-Step Verification Code',
-        text: `Your LIS 2-Step Verification Code is: ${code}. Valid for 10 minutes.`,
-        html: htmlContent,
-      })
-      console.log(`[SMTP] Verification email successfully sent to ${toEmail}`)
-      return
-    } catch (error) {
-      console.error('[SMTP] Failed to send mail, falling back:', error.message)
     }
   }
 
