@@ -7,10 +7,17 @@ async function getResultsByAppointment(req, res) {
 
   const result = await pool.query(
     `
-      SELECT tr.*, t.name as test_name, t.code as test_code, t.reference_range, t.unit
+      SELECT tr.*, 
+             t.name as test_name, 
+             t.code as test_code, 
+             COALESCE(tp.name, t.name) as parameter_name,
+             COALESCE(tr.unit, tp.unit, t.unit) as unit,
+             COALESCE(tr.reference_range, tp.reference_range, t.reference_range) as reference_range
       FROM test_results tr
       JOIN tests t ON tr.test_id = t.id
+      LEFT JOIN test_parameters tp ON tr.parameter_id = tp.id
       WHERE tr.appointment_id = $1
+      ORDER BY t.name, tp.display_order ASC, tr.created_at ASC
     `,
     [appointmentId]
   )
@@ -19,7 +26,7 @@ async function getResultsByAppointment(req, res) {
 }
 
 async function submitResults(req, res) {
-  const { appointmentId, results } = req.body // results is array of { testId, resultValue, isNormal }
+  const { appointmentId, results } = req.body // results is array of { testId, parameterId, resultValue, isNormal }
   const userId = req.auth.sub
 
   if (!appointmentId || !results || !Array.isArray(results) || results.length === 0) {
@@ -38,19 +45,45 @@ async function submitResults(req, res) {
 
     // Insert/upsert each result
     for (const r of results) {
-      const { testId, resultValue, isNormal } = r
+      const { testId, parameterId, resultValue, isNormal } = r
       if (!testId || resultValue === undefined) {
         throw new HttpError(400, 'Each result must include testId and resultValue.')
       }
 
+      // Fetch unit & reference_range from parameter if available, else test
+      let unit = r.unit || null
+      let referenceRange = r.referenceRange || null
+
+      if (!unit || !referenceRange) {
+        if (parameterId) {
+          const paramRes = await client.query('SELECT unit, reference_range FROM test_parameters WHERE id = $1', [parameterId])
+          if (paramRes.rows.length > 0) {
+            unit = unit || paramRes.rows[0].unit
+            referenceRange = referenceRange || paramRes.rows[0].reference_range
+          }
+        }
+        if (!unit || !referenceRange) {
+          const testRes = await client.query('SELECT unit, reference_range FROM tests WHERE id = $1', [testId])
+          if (testRes.rows.length > 0) {
+            unit = unit || testRes.rows[0].unit
+            referenceRange = referenceRange || testRes.rows[0].reference_range
+          }
+        }
+      }
+
       await client.query(
         `
-          INSERT INTO test_results (appointment_id, test_id, result_value, is_normal, entered_by, entered_at)
-          VALUES ($1, $2, $3, $4, $5, NOW())
-          ON CONFLICT (appointment_id, test_id)
-          DO UPDATE SET result_value = EXCLUDED.result_value, is_normal = EXCLUDED.is_normal, entered_by = EXCLUDED.entered_by, entered_at = NOW()
+          INSERT INTO test_results (appointment_id, test_id, parameter_id, result_value, unit, reference_range, is_normal, entered_by, entered_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+          ON CONFLICT (appointment_id, test_id, parameter_id)
+          DO UPDATE SET result_value = EXCLUDED.result_value, 
+                        unit = EXCLUDED.unit,
+                        reference_range = EXCLUDED.reference_range,
+                        is_normal = EXCLUDED.is_normal, 
+                        entered_by = EXCLUDED.entered_by, 
+                        entered_at = NOW()
         `,
-        [appointmentId, testId, String(resultValue).trim(), isNormal !== false, userId]
+        [appointmentId, testId, parameterId || null, String(resultValue).trim(), unit, referenceRange, isNormal !== false, userId]
       )
     }
 
@@ -130,10 +163,17 @@ async function verifyReport(req, res) {
   // Fetch test results for this appointment
   const resultsResult = await pool.query(
     `
-      SELECT tr.*, t.name as test_name, t.code as test_code, t.reference_range, t.unit
+      SELECT tr.*, 
+             t.name as test_name, 
+             t.code as test_code, 
+             COALESCE(tp.name, t.name) as parameter_name,
+             COALESCE(tr.unit, tp.unit, t.unit) as unit,
+             COALESCE(tr.reference_range, tp.reference_range, t.reference_range) as reference_range
       FROM test_results tr
       JOIN tests t ON tr.test_id = t.id
+      LEFT JOIN test_parameters tp ON tr.parameter_id = tp.id
       WHERE tr.appointment_id = $1
+      ORDER BY t.name, tp.display_order ASC, tr.created_at ASC
     `,
     [appointment.id]
   )

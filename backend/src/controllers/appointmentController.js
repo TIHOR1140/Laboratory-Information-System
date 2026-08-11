@@ -10,7 +10,27 @@ async function getPatientAppointments(req, res) {
       SELECT a.*, 
         COALESCE(
           json_agg(
-            json_build_object('id', t.id, 'name', t.name, 'code', t.code, 'price', t.price, 'reference_range', t.reference_range, 'unit', t.unit)
+            json_build_object(
+              'id', t.id, 
+              'name', t.name, 
+              'code', t.code, 
+              'price', t.price, 
+              'reference_range', t.reference_range, 
+              'unit', t.unit,
+              'parameters', (
+                SELECT COALESCE(
+                  json_agg(
+                    json_build_object(
+                      'id', tp.id, 
+                      'name', tp.name, 
+                      'unit', tp.unit, 
+                      'reference_range', tp.reference_range, 
+                      'display_order', tp.display_order
+                    ) ORDER BY tp.display_order ASC, tp.created_at ASC
+                  ), '[]'
+                ) FROM test_parameters tp WHERE tp.test_id = t.id
+              )
+            )
           ) FILTER (WHERE t.id IS NOT NULL), '[]'
         ) as tests,
         i.net_amount, i.payment_status,
@@ -36,7 +56,27 @@ async function listAllAppointments(req, res) {
       SELECT a.*, u.name as patient_name, u.email as patient_email,
         COALESCE(
           json_agg(
-            json_build_object('id', t.id, 'name', t.name, 'code', t.code, 'price', t.price, 'reference_range', t.reference_range, 'unit', t.unit)
+            json_build_object(
+              'id', t.id, 
+              'name', t.name, 
+              'code', t.code, 
+              'price', t.price, 
+              'reference_range', t.reference_range, 
+              'unit', t.unit,
+              'parameters', (
+                SELECT COALESCE(
+                  json_agg(
+                    json_build_object(
+                      'id', tp.id, 
+                      'name', tp.name, 
+                      'unit', tp.unit, 
+                      'reference_range', tp.reference_range, 
+                      'display_order', tp.display_order
+                    ) ORDER BY tp.display_order ASC, tp.created_at ASC
+                  ), '[]'
+                ) FROM test_parameters tp WHERE tp.test_id = t.id
+              )
+            )
           ) FILTER (WHERE t.id IS NOT NULL), '[]'
         ) as tests,
         i.id as invoice_id, i.net_amount, i.payment_status,

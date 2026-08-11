@@ -99,8 +99,10 @@ export function VerifyReportPage() {
                                                 {data.results.map((r) => (
                                                     <tr key={r.id} className="hover:bg-slate-55/50 font-semibold">
                                                         <td className="px-4 py-3">
-                                                            <span className="font-bold text-slate-900 block">{r.test_name}</span>
-                                                            <span className="text-[10px] text-slate-400">{r.test_code}</span>
+                                                            <span className="font-bold text-slate-900 block">{r.parameter_name || r.test_name}</span>
+                                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                                {r.test_code} {r.parameter_name && r.parameter_name !== r.test_name ? `• ${r.test_name}` : ''}
+                                                            </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-[13px] font-black text-slate-900 border-l border-r border-slate-50">
                                                             {r.result_value} <span className="text-[10px] text-slate-500 font-medium">{r.unit}</span>
