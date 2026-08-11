@@ -98,11 +98,26 @@ ON CONFLICT DO NOTHING;
 -- 3. Insert Laboratory Tests Catalog
 INSERT INTO tests (id, name, code, category, price, reference_range, unit)
 VALUES
-  ('c1111111-1111-1111-1111-111111111111', 'Complete Blood Count (CBC)', 'TEST-CBC-01', 'Hematology', 45.00, '4.5 - 11.0', 'x10^3/uL'),
+  ('c1111111-1111-1111-1111-111111111111', 'Complete Blood Count (CBC)', 'TEST-CBC-01', 'Hematology', 45.00, 'Multi-Parameter Panel', 'Panel'),
   ('c2222222-2222-2222-2222-222222222222', 'Fasting Blood Sugar (FBS)', 'TEST-FBS-02', 'Biochemistry', 20.00, '70 - 99', 'mg/dL'),
-  ('c3333333-3333-3333-3333-333333333333', 'Lipid Profile Panel', 'TEST-LIPID-03', 'Biochemistry', 65.00, '< 200 (Total Chol)', 'mg/dL'),
+  ('c3333333-3333-3333-3333-333333333333', 'Lipid Profile Panel', 'TEST-LIPID-03', 'Biochemistry', 65.00, 'Multi-Parameter Panel', 'Panel'),
   ('c4444444-4444-4444-4444-444444444444', 'Thyroid Stimulating Hormone (TSH)', 'TEST-TSH-04', 'Endocrinology', 50.00, '0.4 - 4.0', 'mIU/L')
 ON CONFLICT (code) DO NOTHING;
+
+-- 3b. Insert Test Parameters
+INSERT INTO test_parameters (id, test_id, name, unit, reference_range, display_order)
+VALUES
+  ('10000000-0000-0000-0000-000000000001', 'c1111111-1111-1111-1111-111111111111', 'Hemoglobin', 'g/dL', '13.0 - 17.5', 1),
+  ('10000000-0000-0000-0000-000000000002', 'c1111111-1111-1111-1111-111111111111', 'White Blood Cells (WBC)', 'x10^3/uL', '4.5 - 11.0', 2),
+  ('10000000-0000-0000-0000-000000000003', 'c1111111-1111-1111-1111-111111111111', 'Platelet Count', 'x10^3/uL', '150 - 450', 3),
+  ('10000000-0000-0000-0000-000000000004', 'c1111111-1111-1111-1111-111111111111', 'Red Blood Cells (RBC)', 'x10^6/uL', '4.3 - 5.9', 4),
+  ('20000000-0000-0000-0000-000000000001', 'c2222222-2222-2222-2222-222222222222', 'Fasting Blood Glucose', 'mg/dL', '70 - 99', 1),
+  ('30000000-0000-0000-0000-000000000001', 'c3333333-3333-3333-3333-333333333333', 'Total Cholesterol', 'mg/dL', '< 200', 1),
+  ('30000000-0000-0000-0000-000000000002', 'c3333333-3333-3333-3333-333333333333', 'HDL Cholesterol', 'mg/dL', '> 40', 2),
+  ('30000000-0000-0000-0000-000000000003', 'c3333333-3333-3333-3333-333333333333', 'LDL Cholesterol', 'mg/dL', '< 100', 3),
+  ('30000000-0000-0000-0000-000000000004', 'c3333333-3333-3333-3333-333333333333', 'Triglycerides', 'mg/dL', '< 150', 4),
+  ('40000000-0000-0000-0000-000000000001', 'c4444444-4444-4444-4444-444444444444', 'Thyroid Stimulating Hormone (TSH)', 'mIU/L', '0.4 - 4.0', 1)
+ON CONFLICT DO NOTHING;
 
 -- 4. Insert Appointments
 INSERT INTO appointments (id, patient_id, assigned_to, appointment_date, reason, status, notes)
@@ -151,13 +166,14 @@ VALUES
 ON CONFLICT (barcode) DO NOTHING;
 
 -- 6. Insert Test Results (Manual Entry from Semi-Automatic Equipment)
-INSERT INTO test_results (id, appointment_id, sample_id, test_id, result_value, unit, reference_range, equipment_name, is_normal, remarks, entered_by)
+INSERT INTO test_results (id, appointment_id, sample_id, test_id, parameter_id, result_value, unit, reference_range, equipment_name, is_normal, remarks, entered_by)
 VALUES
   (
     'f1111111-1111-1111-1111-111111111111',
     'b1111111-1111-1111-1111-111111111111',
     'e1111111-1111-1111-1111-111111111111',
     'c1111111-1111-1111-1111-111111111111',
+    '10000000-0000-0000-0000-000000000002',
     '6.8',
     'x10^3/uL',
     '4.5 - 11.0',
@@ -171,6 +187,7 @@ VALUES
     'b1111111-1111-1111-1111-111111111111',
     'e1111111-1111-1111-1111-111111111111',
     'c2222222-2222-2222-2222-222222222222',
+    '20000000-0000-0000-0000-000000000001',
     '92',
     'mg/dL',
     '70 - 99',
@@ -179,7 +196,7 @@ VALUES
     'Fasting blood glucose normal.',
     '33333333-3333-3333-3333-333333333333'
   )
-ON CONFLICT (appointment_id, test_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- 7. Insert Automated PDF Reports Status Tracking
 INSERT INTO reports (id, appointment_id, patient_id, report_number, pdf_path, status, sent_via_email, sent_via_sms, generated_at)

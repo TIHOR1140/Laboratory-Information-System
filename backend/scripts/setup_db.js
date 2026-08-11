@@ -45,6 +45,10 @@ async function tryConnect(host, port, user, password, dbName) {
 
 function updateEnvFile(workingPassword) {
   const envPath = path.resolve(__dirname, '../.env')
+  const examplePath = path.resolve(__dirname, '../.env.example')
+  if (!fs.existsSync(envPath) && fs.existsSync(examplePath)) {
+    fs.copyFileSync(examplePath, envPath)
+  }
   if (!fs.existsSync(envPath)) return
 
   let content = fs.readFileSync(envPath, 'utf8')
@@ -94,9 +98,7 @@ async function setupDatabase() {
 
   console.log(`✅ Authenticated successfully with PostgreSQL user '${creds.user}'!`)
 
-  if (workingPassword !== creds.password) {
-    updateEnvFile(workingPassword)
-  }
+  updateEnvFile(workingPassword)
 
   // Step 1: Ensure database exists
   try {

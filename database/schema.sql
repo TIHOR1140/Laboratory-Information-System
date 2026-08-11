@@ -81,8 +81,20 @@ CREATE TABLE IF NOT EXISTS tests (
   code VARCHAR(50) NOT NULL UNIQUE,
   category VARCHAR(100) NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
-  reference_range TEXT NOT NULL,
+  reference_range TEXT DEFAULT '',
+  unit VARCHAR(50) DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5b. Test Parameters Table (Multi-Parameter Test Support)
+CREATE TABLE IF NOT EXISTS test_parameters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
   unit VARCHAR(50) NOT NULL,
+  reference_range VARCHAR(255) NOT NULL,
+  display_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -101,7 +113,7 @@ CREATE TABLE IF NOT EXISTS samples (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
   sample_type VARCHAR(100) NOT NULL DEFAULT 'Blood',
-  barcode VARCHAR(100) UNIQUE NOT NULL,
+  barcode VARCHAR(100) UNIQUE,
   status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'COLLECTED', 'PROCESSING', 'COMPLETED', 'REJECTED')),
   collected_at TIMESTAMPTZ,
   collected_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -115,6 +127,7 @@ CREATE TABLE IF NOT EXISTS test_results (
   appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
   sample_id UUID REFERENCES samples(id) ON DELETE CASCADE,
   test_id UUID NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+  parameter_id UUID REFERENCES test_parameters(id) ON DELETE CASCADE,
   result_value VARCHAR(255) NOT NULL,
   unit VARCHAR(50),
   reference_range VARCHAR(255),
@@ -125,7 +138,7 @@ CREATE TABLE IF NOT EXISTS test_results (
   entered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (appointment_id, test_id)
+  UNIQUE (appointment_id, test_id, parameter_id)
 );
 
 -- 9. Reports Table (Tracking Status of Automated PDF Report Generation)
@@ -189,6 +202,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- Ensure all new columns exist on pre-existing tables
 ALTER TABLE samples ADD COLUMN IF NOT EXISTS sample_type VARCHAR(100) DEFAULT 'Blood';
 ALTER TABLE test_results ADD COLUMN IF NOT EXISTS sample_id UUID REFERENCES samples(id) ON DELETE CASCADE;
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS parameter_id UUID REFERENCES test_parameters(id) ON DELETE CASCADE;
+ALTER TABLE test_results DROP CONSTRAINT IF EXISTS test_results_appointment_id_test_id_key;
+ALTER TABLE test_results DROP CONSTRAINT IF EXISTS test_results_appointment_id_test_id_parameter_id_key;
+ALTER TABLE test_results ADD CONSTRAINT test_results_appointment_id_test_id_parameter_id_key UNIQUE (appointment_id, test_id, parameter_id);
 ALTER TABLE test_results ADD COLUMN IF NOT EXISTS equipment_name VARCHAR(100) DEFAULT 'Semi-Automatic Analyzer';
 ALTER TABLE test_results ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
 ALTER TABLE test_results ADD COLUMN IF NOT EXISTS reference_range VARCHAR(255);
@@ -203,6 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_phone ON patients(phone);
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments(patient_id);
 CREATE INDEX IF NOT EXISTS idx_samples_barcode ON samples(barcode);
 CREATE INDEX IF NOT EXISTS idx_samples_appt ON samples(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_test_parameters_test_id ON test_parameters(test_id);
 CREATE INDEX IF NOT EXISTS idx_test_results_appt ON test_results(appointment_id);
 CREATE INDEX IF NOT EXISTS idx_reports_appt ON reports(appointment_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_appt ON invoices(appointment_id);

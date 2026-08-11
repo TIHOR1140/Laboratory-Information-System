@@ -108,10 +108,34 @@ export function TechnicianDashboardPage() {
       return
     }
 
-    // Initialize resultsForm with empty values
+    // Initialize resultsForm with empty values for each parameter
     const initialForm = {}
     matchedAppt.tests?.forEach(t => {
-      initialForm[t.id] = { value: '', isNormal: true }
+      if (Array.isArray(t.parameters) && t.parameters.length > 0) {
+        t.parameters.forEach(p => {
+          const key = `${t.id}_${p.id}`
+          initialForm[key] = {
+            testId: t.id,
+            parameterId: p.id,
+            paramName: p.name,
+            unit: p.unit,
+            referenceRange: p.reference_range,
+            value: '',
+            isNormal: true
+          }
+        })
+      } else {
+        const key = `${t.id}_default`
+        initialForm[key] = {
+          testId: t.id,
+          parameterId: null,
+          paramName: t.name,
+          unit: t.unit,
+          referenceRange: t.reference_range,
+          value: '',
+          isNormal: true
+        }
+      }
     })
 
     setActiveSession({
@@ -128,8 +152,9 @@ export function TechnicianDashboardPage() {
     setError('')
     setMessage('')
 
-    const submissionResults = Object.entries(resultsForm).map(([testId, r]) => ({
-      testId,
+    const submissionResults = Object.values(resultsForm).map(r => ({
+      testId: r.testId,
+      parameterId: r.parameterId,
       resultValue: r.value,
       isNormal: r.isNormal
     }))
@@ -137,7 +162,7 @@ export function TechnicianDashboardPage() {
     // Validate that all fields have values
     const isAnyEmpty = submissionResults.some(r => !r.resultValue.trim())
     if (isAnyEmpty) {
-      setError('Please fill in observation values for all tests before signing off.')
+      setError('Please fill in observation values for all test parameters before signing off.')
       setSaving(false)
       return
     }
@@ -157,17 +182,17 @@ export function TechnicianDashboardPage() {
     }
   }
 
-  const handleFormValueChange = (testId, val) => {
+  const handleFormValueChange = (key, val) => {
     setResultsForm(c => ({
       ...c,
-      [testId]: { ...c[testId], value: val }
+      [key]: { ...c[key], value: val }
     }))
   }
 
-  const handleFormNormalChange = (testId, normalVal) => {
+  const handleFormNormalChange = (key, normalVal) => {
     setResultsForm(c => ({
       ...c,
-      [testId]: { ...c[testId], isNormal: normalVal }
+      [key]: { ...c[key], isNormal: normalVal }
     }))
   }
 
@@ -327,44 +352,62 @@ export function TechnicianDashboardPage() {
               <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b pb-1">Observation Sheets</p>
 
-                {activeSession.appointment.tests?.map((t) => (
-                  <div key={t.id} className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm hover:border-slate-300 transition">
-                    <div className="flex justify-between items-start font-semibold">
-                      <div>
-                        <span className="inline-block bg-slate-100 border text-slate-655 text-[9px] font-bold rounded px-1.5 py-0.5 uppercase mb-1">
+                {activeSession.appointment.tests?.map((t) => {
+                  const paramItems = (Array.isArray(t.parameters) && t.parameters.length > 0)
+                    ? t.parameters
+                    : [{ id: null, name: t.name, unit: t.unit, reference_range: t.reference_range }]
+
+                  return (
+                    <div key={t.id} className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm hover:border-slate-300 transition">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <span className="inline-block bg-slate-100 border text-slate-655 text-[9px] font-bold rounded px-1.5 py-0.5 uppercase">
                           {t.code}
                         </span>
-                        <p className="text-sm font-bold text-slate-800 leading-tight">{t.name}</p>
+                        <p className="text-sm font-bold text-slate-800">{t.name}</p>
                       </div>
-                      <div className="text-right text-[10px] text-slate-400">
-                        <p>Unit: <span className="font-bold text-slate-600">{t.unit}</span></p>
-                        <p>Normal: <span className="font-bold text-slate-600">{t.reference_range}</span></p>
-                      </div>
-                    </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3 items-center">
-                      <div className="sm:col-span-2">
-                        <input
-                          type="text"
-                          required
-                          value={resultsForm[t.id]?.value || ''}
-                          onChange={(e) => handleFormValueChange(t.id, e.target.value)}
-                          placeholder={`Enter observed value (${t.unit})`}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 text-xs outline-none focus:border-blue-500 transition"
-                        />
+                      <div className="space-y-3">
+                        {paramItems.map((p, idx) => {
+                          const formKey = p.id ? `${t.id}_${p.id}` : `${t.id}_default`
+                          const currentItem = resultsForm[formKey] || { value: '', isNormal: true }
+
+                          return (
+                            <div key={p.id || idx} className="p-3 rounded-xl bg-slate-50/70 border border-slate-150 space-y-2">
+                              <div className="flex justify-between items-center text-xs font-semibold">
+                                <span className="font-extrabold text-slate-800">{p.name}</span>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  Ref: <strong className="text-slate-700">{p.reference_range}</strong> {p.unit}
+                                </span>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-3 items-center">
+                                <div className="sm:col-span-2">
+                                  <input
+                                    type="text"
+                                    required
+                                    value={currentItem.value || ''}
+                                    onChange={(e) => handleFormValueChange(formKey, e.target.value)}
+                                    placeholder={`Enter value (${p.unit})`}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 text-xs outline-none focus:border-blue-500 transition font-medium"
+                                  />
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer select-none font-bold">
+                                  <input
+                                    type="checkbox"
+                                    checked={!currentItem.isNormal}
+                                    onChange={(e) => handleFormNormalChange(formKey, !e.target.checked)}
+                                    className="rounded text-rose-500 focus:ring-rose-500 h-4 w-4 cursor-pointer"
+                                  />
+                                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Abnormal</span>
+                                </label>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                      <label className="flex items-center gap-2 cursor-pointer select-none font-bold">
-                        <input
-                          type="checkbox"
-                          checked={!resultsForm[t.id]?.isNormal}
-                          onChange={(e) => handleFormNormalChange(t.id, !e.target.checked)}
-                          className="rounded text-rose-500 focus:ring-rose-500 h-4 w-4 cursor-pointer"
-                        />
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Abnormal</span>
-                      </label>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               <button

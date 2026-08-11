@@ -257,39 +257,47 @@ export function PatientPage() {
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(51, 65, 85) // slate-700
       
+      let lastTestName = ''
       for (const res of reportResults) {
-        y += 8
-        // Parameter name & code
+        // Render test panel header if changed
+        if (res.test_name !== lastTestName) {
+          y += 6
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(9)
+          pdf.setTextColor(30, 58, 138) // blue-900
+          pdf.text(`${res.test_name} (${res.test_code.toUpperCase()})`, margin, y)
+          lastTestName = res.test_name
+          y += 2
+        }
+
+        y += 6
+        // Parameter name
+        const displayName = res.parameter_name || res.test_name
         pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(8.5)
         pdf.setTextColor(15, 23, 42)
-        pdf.text(res.test_name, margin + 2, y)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(7)
-        pdf.setTextColor(148, 163, 184)
-        pdf.text(res.test_code.toUpperCase(), margin + 2, y + 4)
+        pdf.text(displayName, margin + 4, y)
 
         // Observed Value
-        pdf.setFontSize(8.5)
         if (res.is_normal) {
           pdf.setTextColor(15, 23, 42)
-          pdf.text(String(res.result_value), margin + 60, y + 2)
+          pdf.text(String(res.result_value), margin + 60, y)
         } else {
           pdf.setTextColor(225, 29, 72) // rose-600
           pdf.setFont('helvetica', 'bold')
-          pdf.text(`${res.result_value}  (ABNORMAL)`, margin + 60, y + 2)
+          pdf.text(`${res.result_value}  (ABNORMAL)`, margin + 60, y)
           pdf.setFont('helvetica', 'normal')
         }
 
         // Reference & Unit
         pdf.setTextColor(71, 85, 105)
-        pdf.text(res.reference_range, margin + 100, y + 2)
-        pdf.text(res.unit, margin + 145, y + 2)
+        pdf.text(res.reference_range || '', margin + 100, y)
+        pdf.text(res.unit || '', margin + 145, y)
 
-        y += 4
+        y += 2
         // Row divider
         pdf.setDrawColor(241, 245, 249) // slate-100
-        pdf.line(margin, y + 2, pageWidth - margin, y + 2)
-        y += 2
+        pdf.line(margin, y + 1, pageWidth - margin, y + 1)
       }
 
       y += 20
@@ -781,8 +789,10 @@ export function PatientPage() {
                         {reportResults.map((res) => (
                           <tr key={res.id} className="text-slate-700">
                             <td className="py-3">
-                              <p className="font-bold text-slate-800">{res.test_name}</p>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">{res.test_code}</p>
+                              <p className="font-bold text-slate-800">{res.parameter_name || res.test_name}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                {res.test_code} {res.parameter_name && res.parameter_name !== res.test_name ? `• ${res.test_name}` : ''}
+                              </p>
                             </td>
                             <td className="py-3 font-bold">
                               <span className={res.is_normal ? 'text-slate-900' : 'text-rose-600 font-extrabold bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg'}>
