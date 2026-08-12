@@ -81,19 +81,32 @@ export function LoginPage() {
       
       {/* Login Card - Solid White with Border */}
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-xl transition-all duration-300">
-        
-        {/* Icon Badge */}
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-slate-850 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-800 shadow-sm">
-          {mfaRequired ? <ShieldAlert className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
-        </div>
+
+    
+  {/* Lab logo */}
+    <div className="mx-auto mb-4 flex h-28 w-28 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-950 overflow-hidden border-[0.5px] border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+    <img
+     src="/lab-logo.png"
+      alt="Lab logo"
+      className="h-full w-full object-contain"
+    />
+    </div>
+
 
         {!mfaRequired ? (
           <>
-            {/* Header */}
-            <h1 className="mt-4 text-center text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">Sign In</h1>
-            <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Secure access to your Clinical LIS Workspace
-            </p>
+        <>
+    {/* Lab Name */}
+     <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+       Life Care Medical Laboratory
+      </h2>
+
+    {/* Login Header */}
+    <h1 className="mt-5 text-center text-xl font-semibold text-slate-800 dark:text-slate-100">
+      Sign In
+    </h1>
+
+  </>
 
             {/* Error Alert */}
             {error && (
