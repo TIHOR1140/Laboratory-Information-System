@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 CREATE TABLE IF NOT EXISTS patients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  patient_code VARCHAR(50) UNIQUE,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   email VARCHAR(255),
@@ -60,6 +61,8 @@ CREATE TABLE IF NOT EXISTS patients (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS patient_code VARCHAR(50) UNIQUE;
 
 -- 4. Appointments Table (Online Booking Details & Scheduling Status)
 CREATE TABLE IF NOT EXISTS appointments (

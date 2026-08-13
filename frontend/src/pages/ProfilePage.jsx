@@ -94,7 +94,8 @@ export function ProfilePage() {
     }
 
     void load()
-  }, [refreshProfile, user?.firstName, user?.lastName])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleProfileSubmit = async (event) => {
     event.preventDefault()
@@ -252,6 +253,14 @@ export function ProfilePage() {
               <ShieldCheck className="h-4 w-4" />
               {user?.role} Access Mode
             </span>
+            {profile?.patientCode && (
+              <>
+                <span className="inline-block h-3 w-[1px] bg-slate-200" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-0.5 text-xs font-extrabold">
+                  ID: {profile.patientCode}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </section>

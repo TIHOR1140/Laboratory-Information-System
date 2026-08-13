@@ -17,7 +17,7 @@ async function getResultsByAppointment(req, res) {
       JOIN tests t ON tr.test_id = t.id
       LEFT JOIN test_parameters tp ON tr.parameter_id = tp.id
       WHERE tr.appointment_id = $1
-      ORDER BY t.name, tp.display_order ASC, tr.created_at ASC
+      ORDER BY t.name, tp.display_order ASC, tr.entered_at ASC
     `,
     [appointmentId]
   )

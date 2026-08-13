@@ -104,6 +104,23 @@ async function registerPatient(req, res) {
       [user.id, phone.trim(), dateOfBirth, gender]
     )
 
+    // Generate unique patient_code
+    const countRes = await client.query('SELECT COUNT(*) FROM patients')
+    const nextNum = parseInt(countRes.rows[0].count || 0) + 1
+    const patientCode = `PAT-2026-${String(nextNum).padStart(4, '0')}`
+
+    const nameParts = patientFullName.split(' ')
+    const firstName = nameParts[0] || patientFullName
+    const lastName = nameParts.slice(1).join(' ') || 'Patient'
+
+    await client.query(
+      `
+        INSERT INTO patients (user_id, patient_code, first_name, last_name, email, phone, date_of_birth, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `,
+      [user.id, patientCode, firstName, lastName, normalizedEmail, phone.trim(), dateOfBirth, gender]
+    )
+
     // FIXED: Commit first, then log audit
     await client.query('COMMIT')
 

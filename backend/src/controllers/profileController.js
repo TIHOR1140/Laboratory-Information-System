@@ -10,15 +10,19 @@ async function getProfile(req, res) {
     [req.auth.sub],
   )
   const profileResult = await pool.query('SELECT * FROM user_profiles WHERE user_id = $1', [req.auth.sub])
+  const patientResult = await pool.query('SELECT patient_code FROM patients WHERE user_id = $1', [req.auth.sub])
 
   if (userResult.rowCount === 0) {
     throw new HttpError(404, 'Profile not found.')
   }
 
+  const patientCode = patientResult.rows[0]?.patient_code || 'PAT-2026-0001'
+  const profileData = { ...publicProfile(profileResult.rows[0]), patientCode }
+
   return res.status(200).json({
     user: publicUser(userResult.rows[0]),
-    patient: publicProfile(profileResult.rows[0]),
-    profile: publicProfile(profileResult.rows[0]),
+    patient: profileData,
+    profile: profileData,
   })
 }
 
