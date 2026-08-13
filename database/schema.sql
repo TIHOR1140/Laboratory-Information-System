@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS two_factor_method VARCHAR(50);
 
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255),
+ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMPTZ;
+
 -- 2. User Profiles Table
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

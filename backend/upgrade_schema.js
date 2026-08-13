@@ -42,6 +42,20 @@ async function run() {
     `)
     console.log('✔ Column "email_otp_expires_at" verified/added.')
 
+    // Add reset_password_token
+    await client.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255) DEFAULT NULL
+    `)
+    console.log('✔ Column "reset_password_token" verified/added.')
+
+    // Add reset_password_expires
+    await client.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMPTZ DEFAULT NULL
+    `)
+    console.log('✔ Column "reset_password_expires" verified/added.')
+
     // Add patient_code to patients table
     await client.query(`
       ALTER TABLE patients 

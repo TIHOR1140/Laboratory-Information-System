@@ -7,7 +7,7 @@ const { logAudit } = require('../services/auditService')
 const { normalizeEmail } = require('../utils/validation')
 const { fullName, publicUser, publicProfile, splitName } = require('../utils/user')
 const { generateSecret, generateQRCodeDataURL, verifyTOTP } = require('../utils/twoFactor')
-const { sendOTPEmail } = require('../services/emailService')
+const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService')
 
 const crypto = require('crypto')
 
@@ -457,6 +457,76 @@ async function logout(req, res) {
   })
 }
 
+async function forgotPassword(req, res) {
+  const { email } = req.body
+  const normalizedEmail = normalizeEmail(email)
+
+  const result = await pool.query('SELECT id, name FROM users WHERE email = $1 AND is_active = TRUE', [normalizedEmail])
+  if (result.rowCount === 0) {
+    // Return 200 to prevent email enumeration attacks
+    return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' })
+  }
+
+  const user = result.rows[0]
+  
+  // Generate secure random token
+  const resetToken = crypto.randomBytes(32).toString('hex')
+  // Hash token for database storage
+  const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000) // 30 mins
+
+  await pool.query(
+    'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+    [hashedToken, expiresAt, user.id]
+  )
+
+  const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`
+  await sendPasswordResetEmail(normalizedEmail, resetLink, user.name)
+  await logAudit(user.id, 'Password Reset Requested', 'User requested a password reset link.')
+
+  return res.status(200).json({
+    message: 'If an account with that email exists, a reset link has been sent.',
+  })
+}
+
+async function resetPassword(req, res) {
+  const { token, password } = req.body
+
+  if (!token) throw new HttpError(400, 'Invalid or missing reset token.')
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
+
+  const result = await pool.query(
+    'SELECT id FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW() AND is_active = TRUE',
+    [hashedToken]
+  )
+
+  if (result.rowCount === 0) {
+    throw new HttpError(400, 'Token is invalid or has expired.')
+  }
+
+  const user = result.rows[0]
+  const passwordHash = await hashPassword(password)
+
+  await pool.query(
+    `UPDATE users 
+     SET password_hash = $1, 
+         reset_password_token = NULL, 
+         reset_password_expires = NULL, 
+         updated_at = NOW() 
+     WHERE id = $2`,
+    [passwordHash, user.id]
+  )
+
+  // Invalidate all active sessions for security
+  await pool.query('UPDATE user_sessions SET is_revoked = TRUE WHERE user_id = $1 AND is_revoked = FALSE', [user.id])
+  await logAudit(user.id, 'Password Reset Complete', 'User successfully reset their password and all sessions were revoked.')
+
+  return res.status(200).json({
+    message: 'Password has been successfully reset. Please log in with your new password.',
+  })
+}
+
 module.exports = {
   registerPatient,
   login,
@@ -467,4 +537,6 @@ module.exports = {
   requestDisableTwoFactor,
   verifyTwoFactorLogin,
   resendTwoFactor,
+  forgotPassword,
+  resetPassword,
 }
