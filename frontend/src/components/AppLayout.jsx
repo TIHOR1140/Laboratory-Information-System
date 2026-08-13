@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import {
-  Building2,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -41,6 +40,11 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const navigation = navigationByRole[user?.role] || []
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase()
+  const displayUserName =
+    user?.name ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+    user?.email ||
+    'User'
   
   // Theme state
   const [darkMode, setDarkMode] = useState(() => {
@@ -65,10 +69,10 @@ export function AppLayout() {
       <aside className="hidden w-64 border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 md:flex md:flex-col print:hidden shrink-0">
         <div className="flex h-16 items-center border-b border-slate-200/80 dark:border-slate-800 px-6">
           <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow shadow-blue-600/10">
-              <Building2 className="h-4 w-4" />
+            <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
+              <img src="/lab-logo.png" alt="Life Care LIS logo" className="h-full w-full object-contain" />
             </span>
-            <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">LIS Laboratory</span>
+            <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Life Care LIS</span>
           </Link>
         </div>
 
@@ -95,28 +99,6 @@ export function AppLayout() {
           })}
         </nav>
 
-        {/* User initials card in Sidebar Footer */}
-        <div className="border-t border-slate-200/85 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex items-center gap-3 px-2 py-1.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-slate-800 text-xs font-bold text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-slate-700">
-              {initials || 'U'}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="truncate text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{user?.role}</p>
-            </div>
-          </div>
-
-          <button
-            onClick={logout}
-            className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-700 transition"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            Sign Out
-          </button>
-        </div>
       </aside>
 
       {/* Main Panel Content Area */}
@@ -141,6 +123,20 @@ export function AppLayout() {
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {darkMode ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+            </button>
+
+            <div className="hidden items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200 sm:flex">
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                {displayUserName}
+              </span>
+            </div>
+
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300 dark:hover:bg-rose-950/30"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
 
             <Link to="/profile" className="flex items-center gap-3">
