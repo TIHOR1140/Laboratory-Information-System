@@ -1,13 +1,14 @@
 const pool = require('../config/db');
 const HttpError = require('../utils/httpError');
 const { logAudit } = require('../services/auditService');
+const { generateReceiptQRCodeDataURL } = require('../utils/qrGenerator');
 
 async function getPatientAppointments(req, res) {
   const patientId = req.auth.sub;
 
   const result = await pool.query(
     `
-      SELECT a.*, 
+      SELECT a.*, p.patient_code, u.name as patient_name,
         COALESCE(
           json_agg(
             json_build_object(
@@ -36,24 +37,41 @@ async function getPatientAppointments(req, res) {
         i.net_amount, i.payment_status,
         s.barcode, s.status as sample_status
       FROM appointments a
+      JOIN users u ON a.patient_id = u.id
+      LEFT JOIN patients p ON a.patient_id = p.user_id
       LEFT JOIN appointment_tests ast ON a.id = ast.appointment_id
       LEFT JOIN tests t ON ast.test_id = t.id
       LEFT JOIN invoices i ON a.id = i.appointment_id
       LEFT JOIN samples s ON a.id = s.appointment_id
       WHERE a.patient_id = $1
-      GROUP BY a.id, i.net_amount, i.payment_status, s.barcode, s.status
+      GROUP BY a.id, p.patient_code, u.name, i.net_amount, i.payment_status, s.barcode, s.status
       ORDER BY a.appointment_date DESC
     `,
     [patientId]
   );
 
-  res.status(200).json(result.rows);
+  const rows = await Promise.all(
+    result.rows.map(async (row) => {
+      const qrCodeDataUrl = await generateReceiptQRCodeDataURL({
+        patientName: row.patient_name,
+        patientCode: row.patient_code || 'PAT-2026-0001',
+        barcode: row.barcode || 'N/A',
+        appointmentDate: row.appointment_date,
+        tests: row.tests || [],
+        totalAmount: row.net_amount || 0,
+        paymentStatus: row.payment_status || 'PENDING'
+      })
+      return { ...row, qrCodeDataUrl }
+    })
+  )
+
+  res.status(200).json(rows);
 }
 
 async function listAllAppointments(req, res) {
   const result = await pool.query(
     `
-      SELECT a.*, u.name as patient_name, u.email as patient_email,
+      SELECT a.*, u.name as patient_name, u.email as patient_email, p.patient_code,
         COALESCE(
           json_agg(
             json_build_object(
@@ -83,15 +101,32 @@ async function listAllAppointments(req, res) {
         s.id as sample_id, s.barcode, s.status as sample_status
       FROM appointments a
       JOIN users u ON a.patient_id = u.id
+      LEFT JOIN patients p ON a.patient_id = p.user_id
       LEFT JOIN appointment_tests ast ON a.id = ast.appointment_id
       LEFT JOIN tests t ON ast.test_id = t.id
       LEFT JOIN invoices i ON a.id = i.appointment_id
       LEFT JOIN samples s ON a.id = s.appointment_id
-      GROUP BY a.id, u.name, u.email, i.id, i.net_amount, i.payment_status, s.id, s.barcode, s.status
+      GROUP BY a.id, u.name, u.email, p.patient_code, i.id, i.net_amount, i.payment_status, s.id, s.barcode, s.status
       ORDER BY a.appointment_date DESC
     `
   );
-  res.status(200).json(result.rows);
+
+  const rows = await Promise.all(
+    result.rows.map(async (row) => {
+      const qrCodeDataUrl = await generateReceiptQRCodeDataURL({
+        patientName: row.patient_name,
+        patientCode: row.patient_code || 'PAT-2026-0001',
+        barcode: row.barcode || 'N/A',
+        appointmentDate: row.appointment_date,
+        tests: row.tests || [],
+        totalAmount: row.net_amount || 0,
+        paymentStatus: row.payment_status || 'PENDING'
+      })
+      return { ...row, qrCodeDataUrl }
+    })
+  )
+
+  res.status(200).json(rows);
 }
 
 async function createAppointment(req, res) {

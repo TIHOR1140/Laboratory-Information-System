@@ -107,6 +107,66 @@ async function sendOTPEmail(toEmail, code, userName) {
   console.log(`======================================================\n`)
 }
 
+async function sendPasswordResetEmail(toEmail, resetLink, userName) {
+  const htmlContent = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+      <h2 style="color: #2563eb; margin-bottom: 16px;">LIS Password Reset</h2>
+      <p>Hello ${userName || 'User'},</p>
+      <p>We received a request to reset the password for your Laboratory Information System account.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reset Password</a>
+      </div>
+      <p style="color: #64748b; font-size: 14px;">This link is valid for 30 minutes. If you did not request a password reset, please ignore this email or secure your account.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+      <p style="color: #94a3b8; font-size: 12px; text-align: center;">Clinical LIS Workspace © 2026</p>
+    </div>
+  `
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: toEmail,
+        subject: 'Reset your LIS Password',
+        text: `You requested a password reset. Please click this link to reset your password: ${resetLink} . Valid for 30 minutes.`,
+        html: htmlContent,
+      })
+      console.log(`[SMTP] Password reset email successfully sent to ${toEmail}`)
+      return
+    } catch (error) {
+      console.error('[SMTP] Failed to send mail, falling back:', error.message)
+    }
+  }
+
+  if (resendClient) {
+    try {
+      const response = await resendClient.emails.send({
+        from: resendFrom,
+        to: toEmail,
+        subject: 'Reset your LIS Password',
+        html: htmlContent,
+      })
+      if (response.error) throw new Error(response.error.message || 'Resend API Error')
+      console.log(`[Resend] Password reset email successfully sent to ${toEmail}`)
+      return
+    } catch (error) {
+      console.error('[Resend] Failed to send email via Resend:', error.message)
+    }
+  }
+
+  // Fallback: Log to files
+  const logDir = path.join(__dirname, '../../tmp')
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true })
+  const logPath = path.join(logDir, 'sent_emails.log')
+  fs.appendFileSync(logPath, `[${new Date().toISOString()}] To: ${toEmail} | Reset Link: ${resetLink}\n`)
+
+  console.log(`\n======================================================`)
+  console.log(`[EMAIL SERVICE MOCK] Sent to: ${toEmail}`)
+  console.log(`[EMAIL SERVICE MOCK] Password Reset Link: ${resetLink}`)
+  console.log(`======================================================\n`)
+}
+
 module.exports = {
   sendOTPEmail,
+  sendPasswordResetEmail,
 }

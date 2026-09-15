@@ -14,6 +14,8 @@ import {
   Printer,
   FileText,
   Download,
+  QrCode,
+  Receipt,
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -30,6 +32,9 @@ export function PatientPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [confirmCancelId, setConfirmCancelId] = useState(null)
+
+  // Receipt QR Modal State
+  const [activeReceiptAppt, setActiveReceiptAppt] = useState(null)
 
   // Report Modal State
   const [activeReportAppt, setActiveReportAppt] = useState(null)
@@ -361,7 +366,15 @@ export function PatientPage() {
     <div className="space-y-6">
       {/* Welcome & Overview section */}
       <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8 print:hidden">
-        <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-600">Patient Portal</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-600">Patient Portal</p>
+          {appointments[0]?.patient_code && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1 text-xs font-extrabold shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Patient ID: {appointments[0].patient_code}
+            </span>
+          )}
+        </div>
         <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">Your Health Dashboard</h2>
         <p className="mt-3 max-w-3xl text-sm md:text-base leading-relaxed text-slate-500 font-medium">
           Welcome to your personal health dashboard. Here you can schedule and manage appointments, view test results, and download laboratory report prints.
@@ -492,6 +505,15 @@ export function PatientPage() {
                           >
                             {appt.status}
                           </span>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveReceiptAppt(appt)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 border border-slate-200 hover:bg-slate-200/60 transition"
+                          >
+                            <QrCode className="h-3.5 w-3.5 text-blue-600" />
+                            Digital QR Receipt
+                          </button>
 
                           {isCompleted && (
                             <button
@@ -878,6 +900,82 @@ export function PatientPage() {
           }
         }
       `}</style>
+
+      {/* Digital QR Receipt & Price Modal */}
+      {activeReceiptAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-150 print:hidden">
+          <div className="w-full max-w-sm rounded-[24px] border border-slate-200 bg-white p-5 shadow-2xl space-y-3.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-blue-600" />
+                <h3 className="font-extrabold text-slate-900 text-sm">Digital Receipt & QR Code</h3>
+              </div>
+              <button
+                onClick={() => setActiveReceiptAppt(null)}
+                className="rounded-full p-1 hover:bg-slate-100 text-slate-400"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-150 rounded-xl">
+              {activeReceiptAppt.qrCodeDataUrl ? (
+                <img
+                  src={activeReceiptAppt.qrCodeDataUrl}
+                  alt="Receipt QR Code"
+                  className="w-40 h-40 object-contain rounded-lg border border-slate-200 shadow-sm bg-white p-1.5"
+                />
+              ) : (
+                <div className="w-40 h-40 flex items-center justify-center bg-slate-100 text-slate-400 text-xs font-semibold rounded-lg">
+                  Generating QR...
+                </div>
+              )}
+              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-2 text-center leading-tight">
+                Scan using any camera app to verify test breakdown & pricing
+              </p>
+            </div>
+
+            {/* Receipt Breakdown */}
+            <div className="space-y-1.5 text-[11px] font-semibold">
+              <div className="flex justify-between border-b border-slate-100 pb-1 text-slate-600">
+                <span>Token Number</span>
+                <span className="font-extrabold text-blue-600">{activeReceiptAppt.patient_code || 'PAT-2026-0001'}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-1 text-slate-600">
+                <span>Sample Barcode</span>
+                <span className="font-bold text-slate-800">{activeReceiptAppt.barcode || 'N/A'}</span>
+              </div>
+
+              {/* Tests & Price Table */}
+              <div className="pt-1.5">
+                <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">Ordered Tests & Prices</p>
+                <div className="space-y-1 bg-slate-50/70 p-2.5 rounded-lg border border-slate-150 max-h-32 overflow-y-auto">
+                  {activeReceiptAppt.tests?.map((t) => (
+                    <div key={t.id || t.code} className="flex justify-between items-center text-slate-700 text-[11px]">
+                      <span>{t.name}</span>
+                      <span className="font-bold text-slate-900">LKR {parseFloat(t.price || 0).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total & Payment */}
+              <div className="flex justify-between items-center pt-2 text-xs font-extrabold border-t border-slate-150">
+                <span className="text-slate-800">Total Net Amount:</span>
+                <span className="text-blue-600">LKR {parseFloat(activeReceiptAppt.net_amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveReceiptAppt(null)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition"
+            >
+              Close Receipt
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

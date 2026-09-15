@@ -5,6 +5,8 @@ import { AuthShell } from './components/AuthShell.jsx'
 import { ProtectedRoute, PublicOnlyRoute } from './components/RouteGuards.jsx'
 import { LoginPage } from './pages/LoginPage.jsx'
 import { RegisterPage } from './pages/RegisterPage.jsx'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage.jsx'
+import { ResetPasswordPage } from './pages/ResetPasswordPage.jsx'
 import { DashboardPage } from './pages/DashboardPage.jsx'
 import { ProfilePage } from './pages/ProfilePage.jsx'
 import { PatientPage } from './pages/PatientPage.jsx'
@@ -26,6 +28,8 @@ function App() {
 
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/register"
           element={

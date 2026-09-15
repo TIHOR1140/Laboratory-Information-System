@@ -7,7 +7,7 @@ const { logAudit } = require('../services/auditService')
 const { normalizeEmail } = require('../utils/validation')
 const { fullName, publicUser, publicProfile, splitName } = require('../utils/user')
 const { generateSecret, generateQRCodeDataURL, verifyTOTP } = require('../utils/twoFactor')
-const { sendOTPEmail } = require('../services/emailService')
+const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService')
 
 const crypto = require('crypto')
 
@@ -79,20 +79,103 @@ async function registerPatient(req, res) {
     throw new HttpError(409, 'An account with this email already exists.')
   }
 
+  const registrationId = crypto.randomUUID()
+  const otp = String(Math.floor(100000 + Math.random() * 900000))
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex')
+  const passwordHash = await hashPassword(password)
+
+  await pool.query(
+    `
+      INSERT INTO pending_registrations
+        (id, name, date_of_birth, gender, email, phone, password_hash, otp_hash, attempts, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, NOW() + INTERVAL '10 minutes')
+      ON CONFLICT (email) DO UPDATE SET
+        id = EXCLUDED.id,
+        name = EXCLUDED.name,
+        date_of_birth = EXCLUDED.date_of_birth,
+        gender = EXCLUDED.gender,
+        phone = EXCLUDED.phone,
+        password_hash = EXCLUDED.password_hash,
+        otp_hash = EXCLUDED.otp_hash,
+        attempts = 0,
+        expires_at = EXCLUDED.expires_at,
+        created_at = NOW()
+    `,
+    [registrationId, patientFullName, dateOfBirth, gender, normalizedEmail, phone.trim(), passwordHash, otpHash]
+  )
+
+  try {
+    await sendOTPEmail(normalizedEmail, otp, patientFullName)
+  } catch (error) {
+    await pool.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+    throw new HttpError(502, 'We could not send the verification email. Please check the email address and try again.')
+  }
+
+  return res.status(200).json({
+    verificationRequired: true,
+    registrationId,
+    message: 'A verification code was sent to your email address.',
+  })
+}
+
+async function verifyRegistration(req, res) {
+  const { registrationId, otp } = req.body
+  if (!/^\d{6}$/.test(String(otp))) {
+    throw new HttpError(400, 'Verification code must contain exactly 6 digits.')
+  }
+
   const client = await pool.connect()
+  let transactionOpen = false
+
   try {
     await client.query('BEGIN')
+    transactionOpen = true
 
-    const passwordHash = await hashPassword(password)
+    const pendingResult = await client.query(
+      'SELECT * FROM pending_registrations WHERE id = $1 FOR UPDATE',
+      [registrationId]
+    )
+    const pending = pendingResult.rows[0]
+
+    if (!pending) {
+      throw new HttpError(400, 'Registration expired or unavailable. Please submit the registration form again.')
+    }
+
+    if (new Date() > new Date(pending.expires_at)) {
+      await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+      await client.query('COMMIT')
+      transactionOpen = false
+      throw new HttpError(400, 'The verification code has expired. Please submit the registration form again.')
+    }
+
+    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex')
+    if (otpHash !== pending.otp_hash) {
+      const attemptResult = await client.query(
+        'UPDATE pending_registrations SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts',
+        [registrationId]
+      )
+      const attempts = attemptResult.rows[0].attempts
+
+      if (attempts >= 3) {
+        await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+        await client.query('COMMIT')
+        transactionOpen = false
+        throw new HttpError(400, 'Incorrect verification code. You have used all 3 attempts. No account was created.')
+      }
+
+      await client.query('COMMIT')
+      transactionOpen = false
+      throw new HttpError(400, `Incorrect verification code. ${3 - attempts} attempt(s) remaining.`)
+    }
+
     const userResult = await client.query(
       `
         INSERT INTO users (name, email, password_hash, role)
         VALUES ($1, $2, $3, 'PATIENT')
         RETURNING id, name, email, role, is_active, last_login, created_at, updated_at
       `,
-      [patientFullName, normalizedEmail, passwordHash],
+      [pending.name, pending.email, pending.password_hash]
     )
-
     const user = userResult.rows[0]
 
     const profileResult = await client.query(
@@ -101,26 +184,38 @@ async function registerPatient(req, res) {
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `,
-      [user.id, phone.trim(), dateOfBirth, gender]
+      [user.id, pending.phone, pending.date_of_birth, pending.gender]
     )
 
-    // FIXED: Commit first, then log audit
+    const countResult = await client.query('SELECT COUNT(*) FROM patients')
+    const patientCode = `PAT-2026-${String(parseInt(countResult.rows[0].count || 0, 10) + 1).padStart(4, '0')}`
+    const nameParts = pending.name.split(' ')
+    const firstName = nameParts[0] || pending.name
+    const lastName = nameParts.slice(1).join(' ') || 'Patient'
+
+    await client.query(
+      `
+        INSERT INTO patients (user_id, patient_code, first_name, last_name, email, phone, date_of_birth, gender)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `,
+      [user.id, patientCode, firstName, lastName, pending.email, pending.phone, pending.date_of_birth, pending.gender]
+    )
+
+    await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
     await client.query('COMMIT')
+    transactionOpen = false
 
-    // Create session
     const jti = await createUserSession(user.id, req)
-
-    // Log audit AFTER commit
-    await logAudit(user.id, 'Registration', `Patient registration created for ${patientFullName}.`)
+    await logAudit(user.id, 'Registration', `Patient registration created for ${pending.name}.`)
 
     return res.status(201).json({
       token: signToken(user, jti),
       user: publicUser(user),
       patient: publicProfile(profileResult.rows[0]),
+      message: 'Email verified successfully. Your account was created.',
     })
-
   } catch (error) {
-    await client.query('ROLLBACK')
+    if (transactionOpen) await client.query('ROLLBACK')
     throw error
   } finally {
     client.release()
@@ -440,8 +535,79 @@ async function logout(req, res) {
   })
 }
 
+async function forgotPassword(req, res) {
+  const { email } = req.body
+  const normalizedEmail = normalizeEmail(email)
+
+  const result = await pool.query('SELECT id, name FROM users WHERE email = $1 AND is_active = TRUE', [normalizedEmail])
+  if (result.rowCount === 0) {
+    // Return 200 to prevent email enumeration attacks
+    return res.status(200).json({ message: 'If an account with that email exists, a reset link has been sent.' })
+  }
+
+  const user = result.rows[0]
+  
+  // Generate secure random token
+  const resetToken = crypto.randomBytes(32).toString('hex')
+  // Hash token for database storage
+  const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000) // 30 mins
+
+  await pool.query(
+    'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+    [hashedToken, expiresAt, user.id]
+  )
+
+  const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`
+  await sendPasswordResetEmail(normalizedEmail, resetLink, user.name)
+  await logAudit(user.id, 'Password Reset Requested', 'User requested a password reset link.')
+
+  return res.status(200).json({
+    message: 'If an account with that email exists, a reset link has been sent.',
+  })
+}
+
+async function resetPassword(req, res) {
+  const { token, password } = req.body
+
+  if (!token) throw new HttpError(400, 'Invalid or missing reset token.')
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
+
+  const result = await pool.query(
+    'SELECT id FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW() AND is_active = TRUE',
+    [hashedToken]
+  )
+
+  if (result.rowCount === 0) {
+    throw new HttpError(400, 'Token is invalid or has expired.')
+  }
+
+  const user = result.rows[0]
+  const passwordHash = await hashPassword(password)
+
+  await pool.query(
+    `UPDATE users 
+     SET password_hash = $1, 
+         reset_password_token = NULL, 
+         reset_password_expires = NULL, 
+         updated_at = NOW() 
+     WHERE id = $2`,
+    [passwordHash, user.id]
+  )
+
+  // Invalidate all active sessions for security
+  await pool.query('UPDATE user_sessions SET is_revoked = TRUE WHERE user_id = $1 AND is_revoked = FALSE', [user.id])
+  await logAudit(user.id, 'Password Reset Complete', 'User successfully reset their password and all sessions were revoked.')
+
+  return res.status(200).json({
+    message: 'Password has been successfully reset. Please log in with your new password.',
+  })
+}
+
 module.exports = {
   registerPatient,
+  verifyRegistration,
   login,
   logout,
   setupTwoFactor,
@@ -450,4 +616,6 @@ module.exports = {
   requestDisableTwoFactor,
   verifyTwoFactorLogin,
   resendTwoFactor,
+  forgotPassword,
+  resetPassword,
 }

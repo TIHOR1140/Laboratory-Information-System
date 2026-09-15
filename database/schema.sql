@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS two_factor_method VARCHAR(50);
 
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255),
+ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMPTZ;
+
 -- 2. User Profiles Table
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,6 +50,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 CREATE TABLE IF NOT EXISTS patients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  patient_code VARCHAR(50) UNIQUE,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   email VARCHAR(255),
@@ -60,6 +65,8 @@ CREATE TABLE IF NOT EXISTS patients (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS patient_code VARCHAR(50) UNIQUE;
 
 -- 4. Appointments Table (Online Booking Details & Scheduling Status)
 CREATE TABLE IF NOT EXISTS appointments (
@@ -188,6 +195,21 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 12b. Pending registrations awaiting email verification
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id UUID PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  date_of_birth DATE NOT NULL,
+  gender VARCHAR(30) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(50) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  otp_hash VARCHAR(64) NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 13. Audit Logs Table

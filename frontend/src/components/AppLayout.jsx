@@ -69,7 +69,7 @@ export function AppLayout() {
       <aside className="hidden w-64 border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 md:flex md:flex-col print:hidden shrink-0">
         <div className="flex h-16 items-center border-b border-slate-200/80 dark:border-slate-800 px-6">
           <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
+            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl">
               <img src="/lab-logo.png" alt="Life Care LIS logo" className="h-full w-full object-contain" />
             </span>
             <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">Life Care LIS</span>
