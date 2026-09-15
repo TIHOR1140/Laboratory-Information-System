@@ -10,6 +10,7 @@ const sampleRoutes = require('./routes/sampleRoutes')
 const invoiceRoutes = require('./routes/invoiceRoutes')
 const resultRoutes = require('./routes/resultRoutes')
 const adminRoutes = require('./routes/adminRoutes')
+const chatRoutes = require('./routes/chatRoutes')
 const { notFound, errorHandler } = require('./middleware/error')
 
 function createApp() {
@@ -36,6 +37,7 @@ function createApp() {
   app.use('/api/invoices', invoiceRoutes)
   app.use('/api/results', resultRoutes)
   app.use('/api/admin', adminRoutes)
+  app.use('/api/chat', chatRoutes)
 
 
 

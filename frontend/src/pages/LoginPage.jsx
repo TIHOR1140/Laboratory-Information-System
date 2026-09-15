@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import { api } from '../lib/api.js'
+import { ChatbotWidget } from '../components/ChatbotWidget.jsx'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -287,6 +288,9 @@ export function LoginPage() {
           </>
         )}
       </div>
+
+      {/* Floating Medical Assistant Chatbot */}
+      <ChatbotWidget />
     </div>
   )
 }

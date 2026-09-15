@@ -13,6 +13,7 @@ import {
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
 import { getDashboardPath } from '../lib/authStorage.js'
+import { ChatbotWidget } from './ChatbotWidget.jsx'
 
 const navigationByRole = {
   ADMIN: [
@@ -154,6 +155,9 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Floating Medical Assistant Chatbot (Only for Patients & Guests) */}
+      {(!user?.role || user?.role === 'PATIENT') && <ChatbotWidget />}
     </div>
   )
 }
