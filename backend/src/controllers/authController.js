@@ -79,20 +79,103 @@ async function registerPatient(req, res) {
     throw new HttpError(409, 'An account with this email already exists.')
   }
 
+  const registrationId = crypto.randomUUID()
+  const otp = String(Math.floor(100000 + Math.random() * 900000))
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex')
+  const passwordHash = await hashPassword(password)
+
+  await pool.query(
+    `
+      INSERT INTO pending_registrations
+        (id, name, date_of_birth, gender, email, phone, password_hash, otp_hash, attempts, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, NOW() + INTERVAL '10 minutes')
+      ON CONFLICT (email) DO UPDATE SET
+        id = EXCLUDED.id,
+        name = EXCLUDED.name,
+        date_of_birth = EXCLUDED.date_of_birth,
+        gender = EXCLUDED.gender,
+        phone = EXCLUDED.phone,
+        password_hash = EXCLUDED.password_hash,
+        otp_hash = EXCLUDED.otp_hash,
+        attempts = 0,
+        expires_at = EXCLUDED.expires_at,
+        created_at = NOW()
+    `,
+    [registrationId, patientFullName, dateOfBirth, gender, normalizedEmail, phone.trim(), passwordHash, otpHash]
+  )
+
+  try {
+    await sendOTPEmail(normalizedEmail, otp, patientFullName)
+  } catch (error) {
+    await pool.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+    throw new HttpError(502, 'We could not send the verification email. Please check the email address and try again.')
+  }
+
+  return res.status(200).json({
+    verificationRequired: true,
+    registrationId,
+    message: 'A verification code was sent to your email address.',
+  })
+}
+
+async function verifyRegistration(req, res) {
+  const { registrationId, otp } = req.body
+  if (!/^\d{6}$/.test(String(otp))) {
+    throw new HttpError(400, 'Verification code must contain exactly 6 digits.')
+  }
+
   const client = await pool.connect()
+  let transactionOpen = false
+
   try {
     await client.query('BEGIN')
+    transactionOpen = true
 
-    const passwordHash = await hashPassword(password)
+    const pendingResult = await client.query(
+      'SELECT * FROM pending_registrations WHERE id = $1 FOR UPDATE',
+      [registrationId]
+    )
+    const pending = pendingResult.rows[0]
+
+    if (!pending) {
+      throw new HttpError(400, 'Registration expired or unavailable. Please submit the registration form again.')
+    }
+
+    if (new Date() > new Date(pending.expires_at)) {
+      await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+      await client.query('COMMIT')
+      transactionOpen = false
+      throw new HttpError(400, 'The verification code has expired. Please submit the registration form again.')
+    }
+
+    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex')
+    if (otpHash !== pending.otp_hash) {
+      const attemptResult = await client.query(
+        'UPDATE pending_registrations SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts',
+        [registrationId]
+      )
+      const attempts = attemptResult.rows[0].attempts
+
+      if (attempts >= 3) {
+        await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
+        await client.query('COMMIT')
+        transactionOpen = false
+        throw new HttpError(400, 'Incorrect verification code. You have used all 3 attempts. No account was created.')
+      }
+
+      await client.query('COMMIT')
+      transactionOpen = false
+      throw new HttpError(400, `Incorrect verification code. ${3 - attempts} attempt(s) remaining.`)
+    }
+
     const userResult = await client.query(
       `
         INSERT INTO users (name, email, password_hash, role)
         VALUES ($1, $2, $3, 'PATIENT')
         RETURNING id, name, email, role, is_active, last_login, created_at, updated_at
       `,
-      [patientFullName, normalizedEmail, passwordHash],
+      [pending.name, pending.email, pending.password_hash]
     )
-
     const user = userResult.rows[0]
 
     const profileResult = await client.query(
@@ -101,16 +184,13 @@ async function registerPatient(req, res) {
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `,
-      [user.id, phone.trim(), dateOfBirth, gender]
+      [user.id, pending.phone, pending.date_of_birth, pending.gender]
     )
 
-    // Generate unique patient_code
-    const countRes = await client.query('SELECT COUNT(*) FROM patients')
-    const nextNum = parseInt(countRes.rows[0].count || 0) + 1
-    const patientCode = `PAT-2026-${String(nextNum).padStart(4, '0')}`
-
-    const nameParts = patientFullName.split(' ')
-    const firstName = nameParts[0] || patientFullName
+    const countResult = await client.query('SELECT COUNT(*) FROM patients')
+    const patientCode = `PAT-2026-${String(parseInt(countResult.rows[0].count || 0, 10) + 1).padStart(4, '0')}`
+    const nameParts = pending.name.split(' ')
+    const firstName = nameParts[0] || pending.name
     const lastName = nameParts.slice(1).join(' ') || 'Patient'
 
     await client.query(
@@ -118,26 +198,24 @@ async function registerPatient(req, res) {
         INSERT INTO patients (user_id, patient_code, first_name, last_name, email, phone, date_of_birth, gender)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
-      [user.id, patientCode, firstName, lastName, normalizedEmail, phone.trim(), dateOfBirth, gender]
+      [user.id, patientCode, firstName, lastName, pending.email, pending.phone, pending.date_of_birth, pending.gender]
     )
 
-    // FIXED: Commit first, then log audit
+    await client.query('DELETE FROM pending_registrations WHERE id = $1', [registrationId])
     await client.query('COMMIT')
+    transactionOpen = false
 
-    // Create session
     const jti = await createUserSession(user.id, req)
-
-    // Log audit AFTER commit
-    await logAudit(user.id, 'Registration', `Patient registration created for ${patientFullName}.`)
+    await logAudit(user.id, 'Registration', `Patient registration created for ${pending.name}.`)
 
     return res.status(201).json({
       token: signToken(user, jti),
       user: publicUser(user),
       patient: publicProfile(profileResult.rows[0]),
+      message: 'Email verified successfully. Your account was created.',
     })
-
   } catch (error) {
-    await client.query('ROLLBACK')
+    if (transactionOpen) await client.query('ROLLBACK')
     throw error
   } finally {
     client.release()
@@ -529,6 +607,7 @@ async function resetPassword(req, res) {
 
 module.exports = {
   registerPatient,
+  verifyRegistration,
   login,
   logout,
   setupTwoFactor,
