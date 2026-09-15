@@ -1,7 +1,7 @@
 const express = require('express')
 const asyncHandler = require('../utils/asyncHandler')
 const { validateBody, required, minLength, email, phone, beforeToday, passwordStrength, oneOf } = require('../utils/validation')
-const { registerPatient, login, logout, setupTwoFactor, enableTwoFactor, disableTwoFactor, requestDisableTwoFactor, verifyTwoFactorLogin, resendTwoFactor, forgotPassword, resetPassword } = require('../controllers/authController')
+const { registerPatient, verifyRegistration, login, logout, setupTwoFactor, enableTwoFactor, disableTwoFactor, requestDisableTwoFactor, verifyTwoFactorLogin, resendTwoFactor, forgotPassword, resetPassword } = require('../controllers/authController')
 const { authenticate } = require('../middleware/auth')
 
 const router = express.Router()
@@ -34,6 +34,15 @@ router.post(
     password: [required('Password'), passwordStrength('Password')],
   }),
   asyncHandler(registerPatient),
+)
+
+router.post(
+  '/register/verify',
+  validateBody({
+    registrationId: [required('Registration ID')],
+    otp: [required('Verification code'), minLength('Verification code', 6)],
+  }),
+  asyncHandler(verifyRegistration),
 )
 
 router.post(

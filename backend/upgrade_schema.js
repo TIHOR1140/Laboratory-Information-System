@@ -90,6 +90,23 @@ async function run() {
     `)
     console.log('✔ Table "test_parameters" verified/created.')
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pending_registrations (
+        id UUID PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        date_of_birth DATE NOT NULL,
+        gender VARCHAR(30) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        phone VARCHAR(50) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        otp_hash VARCHAR(64) NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `)
+    console.log('✔ Table "pending_registrations" verified/created.')
+
     // Update tests table columns
     await client.query(`
       ALTER TABLE tests ADD COLUMN IF NOT EXISTS reference_range TEXT DEFAULT '';
