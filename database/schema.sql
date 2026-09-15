@@ -197,21 +197,6 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 12b. Pending registrations awaiting email verification
-CREATE TABLE IF NOT EXISTS pending_registrations (
-  id UUID PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  date_of_birth DATE NOT NULL,
-  gender VARCHAR(30) NOT NULL,
-  email VARCHAR(255) NOT NULL UNIQUE,
-  phone VARCHAR(50) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  otp_hash VARCHAR(64) NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- 13. Audit Logs Table
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

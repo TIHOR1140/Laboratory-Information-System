@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CheckCircle2, LoaderCircle, ShieldAlert, ArrowRight, UserPlus, ArrowLeft } from 'lucide-react'
+import { CheckCircle2, LoaderCircle, ShieldAlert, ArrowRight, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function RegisterPage() {
   const navigate = useNavigate()
-  const { register, verifyRegistration, getDashboardPath } = useAuth()
+  const { register, getDashboardPath } = useAuth()
   const [form, setForm] = useState({ name: '', dateOfBirth: '', gender: 'Male', email: '', phone: '', password: '' })
-  const [registrationId, setRegistrationId] = useState('')
-  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Password strength calculation
@@ -32,12 +29,10 @@ export function RegisterPage() {
     event.preventDefault()
     setLoading(true)
     setError('')
-    setMessage('')
 
     try {
-      const result = await register(form)
-      setRegistrationId(result.registrationId)
-      setMessage(result.message || 'A verification code was sent to your email address.')
+      const session = await register(form)
+      navigate(getDashboardPath(session.user.role), { replace: true })
     } catch (submitError) {
       const serverMessage = submitError?.response?.data?.message
       const serverErrors = submitError?.response?.data?.errors
@@ -54,34 +49,6 @@ export function RegisterPage() {
     }
   }
 
-  const handleVerify = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    setError('')
-    setMessage('')
-
-    try {
-      const session = await verifyRegistration({ registrationId, otp })
-      navigate(getDashboardPath(session.user.role), { replace: true })
-    } catch (submitError) {
-      const serverMessage = submitError?.response?.data?.message
-      setError(serverMessage || 'Unable to verify the email address.')
-      if (serverMessage?.includes('all 3 attempts')) {
-        setRegistrationId('')
-        setOtp('')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleBackToRegistration = () => {
-    setRegistrationId('')
-    setOtp('')
-    setError('')
-    setMessage('')
-  }
-
   return (
     <div className="space-y-4">
       {error && (
@@ -91,53 +58,7 @@ export function RegisterPage() {
         </div>
       )}
 
-      {message && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 font-medium flex items-center gap-2">
-          <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
-          {message}
-        </div>
-      )}
-
-      {registrationId && (
-        <form onSubmit={handleVerify} className="space-y-4 text-slate-800 dark:text-slate-100">
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
-            Enter the 6-digit code sent to <strong>{form.email}</strong>. The code expires in 10 minutes.
-          </div>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Email Verification Code</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              placeholder="123456"
-              required
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-center text-lg tracking-[0.4em] text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 transition duration-150"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading || otp.length !== 6}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/10 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 transition"
-          >
-            {loading ? <LoaderCircle className="h-4 w-4 animate-spin text-white" /> : <CheckCircle2 className="h-4.5 w-4.5" />}
-            Verify Email and Create Account
-          </button>
-          <button
-            type="button"
-            onClick={handleBackToRegistration}
-            disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900 transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Registration
-          </button>
-        </form>
-      )}
-
-      <form onSubmit={handleSubmit} className={`space-y-4 text-slate-800 dark:text-slate-100${registrationId ? ' hidden' : ''}`}>
+      <form onSubmit={handleSubmit} className="space-y-4 text-slate-800 dark:text-slate-100">
         <label className="block space-y-1.5">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Full Name</span>
           <input

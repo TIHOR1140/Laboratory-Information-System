@@ -31,11 +31,6 @@ export function AuthProvider({ children }) {
 
   const register = async (payload, rememberMe = true) => {
     const response = await api.post('/auth/register', payload)
-    return response.data
-  }
-
-  const verifyRegistration = async ({ registrationId, otp }, rememberMe = true) => {
-    const response = await api.post('/auth/register/verify', { registrationId, otp })
     persistSession(response.data, rememberMe)
     return response.data
   }
@@ -74,7 +69,6 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user && token),
     login,
     register,
-    verifyRegistration,
     logout,
     refreshProfile,
     updateProfile,
