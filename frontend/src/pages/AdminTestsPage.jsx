@@ -1,6 +1,38 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ClipboardPlus, LoaderCircle, Trash2, Edit, Search, Plus, ArrowUp, ArrowDown, ListFilter } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import ReactDOM from 'react-dom'
+import { ClipboardPlus, LoaderCircle, Trash2, Edit, Search, Plus, ArrowUp, ArrowDown, ListFilter, ChevronDown, X } from 'lucide-react'
 import { api } from '../lib/api.js'
+
+// ─── Common lab measurement units ───────────────────────────────────────────
+const LAB_UNITS = [
+  // Concentration / mass per volume
+  'g/dL', 'mg/dL', 'µg/dL', 'ng/dL', 'pg/dL',
+  'g/L', 'mg/L', 'µg/L', 'ng/L', 'pg/L',
+  'mmol/L', 'µmol/L', 'nmol/L', 'pmol/L',
+  'mEq/L', 'µEq/L',
+  'mg/24h', 'g/24h', 'µg/24h',
+  // Counts / cells
+  'cells/µL', '×10³/µL', '×10⁶/µL', '×10⁹/L', '×10¹²/L',
+  '/µL', '/mL', '/hpf', '/lpf',
+  // Percentage / ratio
+  '%', 'ratio', 'index',
+  // Volume / size
+  'fL', 'pg', 'µm',
+  // Enzyme / activity
+  'U/L', 'IU/L', 'mIU/L', 'µIU/mL', 'mIU/mL',
+  'U/mL', 'kU/L', 'kIU/L',
+  // Pressure
+  'mm Hg', 'kPa',
+  // Time
+  'sec', 'min', 'h',
+  // Urine specific
+  'mOsm/kg', 'mOsm/L', 'g/g creatinine', 'mg/g creatinine',
+  // Concentration variants
+  'pg/mL', 'ng/mL', 'µg/mL', 'mg/mL', 'IU/mL', 'ng/dL', 'nmol/dL',
+  // Misc
+  'INR', 'titre', 'copies/mL',
+  'mL/min', 'mL/min/1.73m²', 'µg/g', 'mg/kg', 'ng/kg',
+]
 
 export function AdminTestsPage() {
   const [tests, setTests] = useState([])
@@ -290,13 +322,9 @@ export function AdminTestsPage() {
                         />
                       </div>
                       <div>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Unit (e.g. g/dL)"
+                        <UnitCombobox
                           value={param.unit}
-                          onChange={(e) => handleParameterChange(index, 'unit', e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-500 transition"
+                          onChange={(val) => handleParameterChange(index, 'unit', val)}
                         />
                       </div>
                       <div>
@@ -414,3 +442,169 @@ function TextField({ label, value, onChange, placeholder, type = 'text' }) {
     </label>
   )
 }
+
+// ─── Searchable unit combobox (portal-based to escape overflow containers) ──
+function UnitCombobox({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [dropStyle, setDropStyle] = useState({})
+  const containerRef = useRef(null)
+  const inputRef = useRef(null)
+
+  // Compute dropdown position from the trigger's bounding rect
+  const updatePosition = () => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const viewportH = window.innerHeight
+    const dropH = 192 // max-h ~176px + border
+    const spaceBelow = viewportH - rect.bottom
+    const goAbove = spaceBelow < dropH && rect.top > dropH
+
+    setDropStyle({
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+      ...(goAbove
+        ? { bottom: viewportH - rect.top + 4 }
+        : { top: rect.bottom + 4 }),
+    })
+  }
+
+  // Reposition on scroll / resize while open
+  useEffect(() => {
+    if (!open) return
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target) &&
+        !document.getElementById('unit-combobox-portal')?.contains(e.target)
+      ) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return LAB_UNITS
+    return LAB_UNITS.filter((u) => u.toLowerCase().includes(q))
+  }, [query])
+
+  const handleSelect = (unit) => {
+    onChange(unit)
+    setOpen(false)
+    setQuery('')
+  }
+
+  const handleInputChange = (e) => {
+    const val = e.target.value
+    setQuery(val)
+    onChange(val)
+    setOpen(true)
+  }
+
+  const handleClear = () => {
+    onChange('')
+    setQuery('')
+    inputRef.current?.focus()
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') { setOpen(false); setQuery('') }
+    if (e.key === 'Enter' && open && filtered.length === 1) {
+      e.preventDefault()
+      handleSelect(filtered[0])
+    }
+  }
+
+  // Portal target — reuse a single div appended to body
+  const getPortalRoot = () => {
+    let el = document.getElementById('unit-combobox-portal')
+    if (!el) {
+      el = document.createElement('div')
+      el.id = 'unit-combobox-portal'
+      document.body.appendChild(el)
+    }
+    return el
+  }
+
+  const dropdown = open ? (
+    <div style={dropStyle} className="rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+      {filtered.length === 0 ? (
+        <div className="px-3 py-2 text-[11px] text-slate-400 italic">
+          No match — &ldquo;{query}&rdquo; will be saved as-is
+        </div>
+      ) : (
+        <ul className="max-h-44 overflow-y-auto divide-y divide-slate-50">
+          {filtered.map((unit) => (
+            <li key={unit}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(unit) }}
+                className={`w-full px-3 py-1.5 text-left text-xs font-medium transition
+                  ${value === unit
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                {unit}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  ) : null
+
+  return (
+    <>
+      <div ref={containerRef} className="relative">
+        <div
+          className={`flex items-center gap-1 rounded-xl border bg-white px-2 py-1.5 transition
+            ${open ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200'}`}
+        >
+          <Search className="h-3 w-3 text-slate-400 shrink-0" />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={value || 'Unit (e.g. g/dL)'}
+            value={open ? query : value}
+            onFocus={() => { setOpen(true); setQuery('') }}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            className="min-w-0 flex-1 bg-transparent text-xs text-slate-900 outline-none placeholder:text-slate-400"
+          />
+          {value ? (
+            <button type="button" onClick={handleClear} className="shrink-0 text-slate-400 hover:text-slate-700 transition">
+              <X className="h-3 w-3" />
+            </button>
+          ) : (
+            <button type="button" onClick={() => { setOpen((o) => !o); inputRef.current?.focus() }} className="shrink-0 text-slate-400 hover:text-slate-600 transition">
+              <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Render dropdown outside the scroll container via portal */}
+      {open && typeof document !== 'undefined'
+        ? ReactDOM.createPortal(dropdown, getPortalRoot())
+        : null}
+    </>
+  )
+}
+
