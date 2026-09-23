@@ -19,8 +19,72 @@ import {
   BadgeAlert,
 } from 'lucide-react'
 
+// Common typos normalization map
+const TYPO_MAP = {
+  suger: 'sugar',
+  sugeer: 'sugar',
+  sugre: 'sugar',
+  shugar: 'sugar',
+  cholestrol: 'cholesterol',
+  colestrol: 'cholesterol',
+  appoinment: 'appointment',
+  apointment: 'appointment',
+  recept: 'receipt',
+  receit: 'receipt',
+  resut: 'result',
+  repots: 'report',
+  fastin: 'fasting',
+}
+
+function normalizeUserQuery(query) {
+  let text = String(query || '').toLowerCase()
+  Object.keys(TYPO_MAP).forEach((typo) => {
+    const reg = new RegExp(`\\b${typo}\\b`, 'g')
+    text = text.replace(reg, TYPO_MAP[typo])
+  })
+  return text
+}
+
 // Knowledge Base for LIS Assistant
 const KNOWLEDGE_BASE = [
+  {
+    keywords: ['sugar', 'suger', 'fbs', 'hba1c', 'glucose', 'diabetes', 'fasting blood sugar'],
+    response: `🩸 **Blood Sugar / Diabetes Test Info:**
+- **Fasting Blood Sugar (FBS)**:
+  - **Price**: LKR 650.00
+  - **Fasting**: Requires **8 - 10 hours** of overnight fasting (only plain water permitted).
+- **HbA1c (3-Month Diabetes Index)**:
+  - **Price**: LKR 2,100.00
+  - **Fasting**: **No fasting required**. You can eat normally.
+*You can book both tests directly through your Patient Dashboard!*`,
+  },
+  {
+    keywords: ['cbc', 'fbc', 'blood count', 'hemoglobin', 'wbc', 'platelet', 'anemia', 'blood test'],
+    response: `🩸 **Full Blood Count (CBC / FBC):**
+- **Price**: LKR 1,200.00
+- **Parameters Measured**: Hemoglobin, WBC, Red Blood Cells (RBC), Platelet Count.
+- **Fasting**: **No fasting required**.
+- **Turnaround Time**: Same-day digital report sign-off.`,
+  },
+  {
+    keywords: ['cholesterol', 'lipid', 'hdl', 'ldl', 'triglyceride', 'fat'],
+    response: `🫀 **Lipid Profile (Cholesterol Panel):**
+- **Price**: LKR 2,400.00
+- **Parameters Measured**: Total Cholesterol, HDL, LDL, Triglycerides.
+- **Fasting**: Requires **10 - 12 hours** of strict fasting overnight.`,
+  },
+  {
+    keywords: ['thyroid', 'tsh', 't3', 't4'],
+    response: `🦋 **Thyroid Profile (TSH / T3 / T4):**
+- **Price**: LKR 3,500.00
+- **Fasting**: No strict fasting required. Early morning specimen collection is recommended.`,
+  },
+  {
+    keywords: ['kidney', 'creatinine', 'urea', 'renal'],
+    response: `🩺 **Kidney Function Test (Serum Creatinine & Urea):**
+- **Price**: LKR 1,800.00
+- **Fasting**: 8 hours of fasting is recommended.`,
+  },
   {
     keywords: ['fast', 'fasting', 'eat', 'food', 'water', 'breakfast', 'empty stomach'],
     response: `🩸 **Fasting Guidelines for Lab Tests:**
@@ -39,6 +103,17 @@ const KNOWLEDGE_BASE = [
 - **Thyroid Function Test (TSH / T3 / T4)**: LKR 3,500.00
 - **Kidney Function Test (Serum Creatinine / Urea)**: LKR 1,800.00
 *Digital QR receipts with exact itemized prices are provided for every booking!*`,
+  },
+  {
+    keywords: ['test', 'tests', 'panel', 'profile', 'checkup', 'directory', 'catalog', 'list', 'what tests'],
+    response: `🧪 **Available Clinical Diagnostic Tests:**
+- **Complete Blood Count (CBC)**: LKR 1,200.00
+- **Fasting Blood Sugar (FBS)**: LKR 650.00
+- **HbA1c Profile**: LKR 2,100.00
+- **Lipid Profile (Cholesterol)**: LKR 2,400.00
+- **Thyroid Profile (TSH)**: LKR 3,500.00
+- **Kidney Function Test**: LKR 1,800.00
+*Select any test on your Patient Portal to schedule your appointment!*`,
   },
   {
     keywords: ['hour', 'time', 'open', 'timing', 'working', 'schedule', 'sunday', 'weekend'],
@@ -80,6 +155,22 @@ const KNOWLEDGE_BASE = [
 - **Address**: 124 Clinical Health Avenue, Medical Zone, Sector 4
 - **Phone**: +94 (0) 11 234 5678 / +94 (0) 77 123 4567
 - **Support Email**: support@lis-laboratory.org`,
+  },
+  {
+    keywords: ['hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening', 'who are you', 'help'],
+    response: `👋 **Hello! Welcome to LIS HealthBot!**
+I am your digital laboratory assistant. How can I help you today?
+
+You can ask me about:
+- 🩸 **Blood Tests & Fasting Rules** (e.g., FBS, Lipid, CBC, HbA1c)
+- 💰 **Test Prices & Fees**
+- 📅 **Appointment Booking & Token Numbers**
+- 📜 **Digital QR Receipts & Verification**
+- 🕒 **Lab Hours & Location**`,
+  },
+  {
+    keywords: ['thank', 'thanks', 'thx', 'ok', 'okay', 'great', 'awesome', 'good', 'perfect'],
+    response: `😊 You are very welcome! If you have any more questions about our clinical laboratory services, feel free to ask anytime. Have a healthy day!`,
   },
 ]
 
@@ -238,18 +329,39 @@ How can I help you with your laboratory queries today?`,
   }, [messages, isOpen])
 
   const findMatchingResponse = (userText) => {
-    const textLower = userText.toLowerCase()
+    const normalized = normalizeUserQuery(userText)
+
+    let bestMatch = null
+    let maxScore = 0
 
     for (const kb of KNOWLEDGE_BASE) {
-      if (kb.keywords.some((keyword) => textLower.includes(keyword))) {
-        return kb.response
+      let score = 0
+      for (const keyword of kb.keywords) {
+        if (normalized.includes(keyword)) {
+          score += keyword.length > 4 ? 3 : 2
+        }
+      }
+      if (score > maxScore) {
+        maxScore = score
+        bestMatch = kb.response
       }
     }
 
-    return `⚠️ **Out of Scope Inquiry**
-I am trained exclusively for this Laboratory Information System scope (lab test directory, fasting preparation, test pricing, appointment booking, digital QR receipts, and lab reports).
+    if (bestMatch) {
+      return bestMatch
+    }
 
-If you have questions regarding lab services or test preparation, please let me know! For emergencies, call **+94 11 234 5678**.`
+    return `💡 **I'm here to help with your clinical laboratory queries!**
+
+I didn't find an exact match for your question, but here is how I can assist you:
+
+- 🩸 **Fasting Rules**: Ask *"Fasting rules for blood sugar or lipid profile"*
+- 🧪 **Blood Sugar & Diabetes**: Ask *"Fasting Blood Sugar (FBS) price & rules"*
+- 💰 **Test Prices & Catalog**: Ask *"Show all lab test prices"*
+- 📅 **Bookings & QR Receipts**: Ask *"How to book an appointment"*
+- 🕒 **Lab Hours & Location**: Ask *"What are your opening hours?"*
+
+*For urgent medical emergencies, please call **+94 11 234 5678**.*`
   }
 
   const handleSendMessage = async (textToSend) => {
@@ -274,7 +386,7 @@ If you have questions regarding lab services or test preparation, please let me 
           message: query,
           history: messages.slice(-6),
         },
-        { timeout: 4000 }
+        { timeout: 8000 }
       )
 
       let responseText

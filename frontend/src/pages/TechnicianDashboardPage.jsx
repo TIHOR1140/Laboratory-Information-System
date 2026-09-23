@@ -13,6 +13,7 @@ import {
   FileCheck,
 } from 'lucide-react'
 import { api } from '../lib/api.js'
+import { checkIsNormal } from '../lib/referenceRange.js'
 
 export function TechnicianDashboardPage() {
   const [samples, setSamples] = useState([])
@@ -189,10 +190,14 @@ export function TechnicianDashboardPage() {
   }
 
   const handleFormValueChange = (key, val) => {
-    setResultsForm(c => ({
-      ...c,
-      [key]: { ...c[key], value: val }
-    }))
+    setResultsForm(c => {
+      const current = c[key]
+      const isNormal = checkIsNormal(val, current?.referenceRange)
+      return {
+        ...c,
+        [key]: { ...current, value: val, isNormal }
+      }
+    })
   }
 
   const handleFormNormalChange = (key, normalVal) => {
@@ -382,11 +387,27 @@ export function TechnicianDashboardPage() {
                           {paramItems.map((p, idx) => {
                             const formKey = p.id ? `${t.id}_${p.id}` : `${t.id}_default`
                             const currentItem = resultsForm[formKey] || { value: '', isNormal: true }
+                            const isAbnormal = !currentItem.isNormal
+                            const hasValue = Boolean(currentItem.value && currentItem.value.trim())
 
                             return (
-                              <div key={p.id || idx} className="p-3 rounded-xl bg-slate-50/70 border border-slate-150 space-y-2">
+                              <div
+                                key={p.id || idx}
+                                className={`p-3 rounded-xl border transition-all space-y-2 ${
+                                  isAbnormal
+                                    ? 'bg-rose-50/60 border-rose-200 shadow-sm'
+                                    : 'bg-slate-50/70 border-slate-150'
+                                }`}
+                              >
                                 <div className="flex justify-between items-center text-xs font-semibold">
-                                  <span className="font-extrabold text-slate-800">{p.name}</span>
+                                  <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                                    {p.name}
+                                    {isAbnormal && hasValue && (
+                                      <span className="text-[9px] font-bold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-md border border-rose-200">
+                                        Auto-flagged
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className="text-[10px] text-slate-500 font-medium">
                                     Ref: <strong className="text-slate-700">{p.reference_range}</strong> {p.unit}
                                   </span>
@@ -400,17 +421,23 @@ export function TechnicianDashboardPage() {
                                       value={currentItem.value || ''}
                                       onChange={(e) => handleFormValueChange(formKey, e.target.value)}
                                       placeholder={`Enter value (${p.unit})`}
-                                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 text-xs outline-none focus:border-blue-500 transition font-medium"
+                                      className={`w-full rounded-xl border px-3 py-2 text-xs outline-none transition font-medium ${
+                                        isAbnormal
+                                          ? 'border-rose-300 bg-white text-rose-900 font-bold focus:border-rose-500 focus:ring-1 focus:ring-rose-400'
+                                          : 'border-slate-200 bg-white text-slate-900 focus:border-blue-500'
+                                      }`}
                                     />
                                   </div>
                                   <label className="flex items-center gap-2 cursor-pointer select-none font-bold">
                                     <input
                                       type="checkbox"
-                                      checked={!currentItem.isNormal}
+                                      checked={isAbnormal}
                                       onChange={(e) => handleFormNormalChange(formKey, !e.target.checked)}
-                                      className="rounded text-rose-500 focus:ring-rose-500 h-4 w-4 cursor-pointer"
+                                      className="rounded text-rose-600 focus:ring-rose-500 h-4 w-4 cursor-pointer accent-rose-600"
                                     />
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">Abnormal</span>
+                                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isAbnormal ? 'text-rose-600' : 'text-slate-500'}`}>
+                                      Abnormal
+                                    </span>
                                   </label>
                                 </div>
                               </div>

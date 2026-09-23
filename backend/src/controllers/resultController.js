@@ -1,6 +1,7 @@
 const pool = require('../config/db')
 const HttpError = require('../utils/httpError')
 const { logAudit } = require('../services/auditService')
+const { checkIsNormal } = require('../utils/referenceRange')
 
 async function getResultsByAppointment(req, res) {
   const { appointmentId } = req.params
@@ -71,6 +72,10 @@ async function submitResults(req, res) {
         }
       }
 
+      const finalIsNormal = (isNormal !== undefined && isNormal !== null)
+        ? Boolean(isNormal)
+        : checkIsNormal(resultValue, referenceRange)
+
       await client.query(
         `
           INSERT INTO test_results (appointment_id, test_id, parameter_id, result_value, unit, reference_range, is_normal, entered_by, entered_at)
@@ -83,7 +88,7 @@ async function submitResults(req, res) {
                         entered_by = EXCLUDED.entered_by, 
                         entered_at = NOW()
         `,
-        [appointmentId, testId, parameterId || null, String(resultValue).trim(), unit, referenceRange, isNormal !== false, userId]
+        [appointmentId, testId, parameterId || null, String(resultValue).trim(), unit, referenceRange, finalIsNormal, userId]
       )
     }
 
