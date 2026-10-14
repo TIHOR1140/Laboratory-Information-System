@@ -13,7 +13,10 @@ import {
   Receipt,
   Printer,
   X,
+  FileText,
+  Download,
 } from 'lucide-react'
+import jsPDF from 'jspdf'
 import { api } from '../lib/api.js'
 
 import { socket } from '../lib/socket.js'
@@ -45,6 +48,12 @@ export function ReceptionDashboardPage() {
 
   // State for active specimen QR/Barcode label preview
   const [activeLabelAppt, setActiveLabelAppt] = useState(null)
+
+  // State for active patient test report modal
+  const [activeReportAppt, setActiveReportAppt] = useState(null)
+  const [reportResults, setReportResults] = useState([])
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [downloadingPDF, setDownloadingPDF] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -229,6 +238,216 @@ export function ReceptionDashboardPage() {
     return new Date(dateTimeStr).toLocaleDateString('en-US', options)
   }
 
+  const fetchReportResults = async (appt) => {
+    setLoadingReport(true)
+    setActiveReportAppt(appt)
+    try {
+      const res = await api.get(`/results/appointment/${appt.id}`)
+      setReportResults(res.data)
+    } catch (err) {
+      setError('Unable to fetch report results for this patient.')
+    } finally {
+      setLoadingReport(false)
+    }
+  }
+
+  const handleDownloadReportPDF = async () => {
+    if (!activeReportAppt) return
+    setDownloadingPDF(true)
+
+    try {
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const margin = 20
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const contentWidth = pageWidth - 2 * margin
+      let y = 25
+
+      // Header branding
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(16)
+      pdf.setTextColor(15, 23, 42)
+      pdf.text('LABORATORY INFORMATION SYSTEM (LIS)', pageWidth / 2, y, { align: 'center' })
+      
+      y += 6
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.setTextColor(37, 99, 235)
+      pdf.text('MEDICAL DIAGNOSTICS CLINIC & LABORATORY SERVICES', pageWidth / 2, y, { align: 'center' })
+      
+      y += 5
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('Colombo, Sri Lanka  |  Tel: +94 11 234 5678', pageWidth / 2, y, { align: 'center' })
+      
+      y += 8
+      pdf.setDrawColor(15, 23, 42)
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      y += 8
+      // Metadata Box
+      pdf.setFillColor(248, 250, 252)
+      pdf.setDrawColor(226, 232, 240)
+      pdf.setLineWidth(0.2)
+      pdf.roundedRect(margin, y, contentWidth, 35, 3, 3, 'FD')
+
+      // Metadata Text
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.setTextColor(71, 85, 105)
+      
+      const textYStart = y + 7
+      pdf.text('Patient Name:', margin + 6, textYStart)
+      pdf.text('Appointment:', margin + 6, textYStart + 7)
+      pdf.text('Barcode Sample:', margin + 6, textYStart + 14)
+
+      pdf.text('Report Code:', margin + 105, textYStart)
+      pdf.text('Status:', margin + 105, textYStart + 7)
+      pdf.text('Completed Date:', margin + 105, textYStart + 14)
+      pdf.text('Time:', margin + 105, textYStart + 20)
+
+      // Values
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(15, 23, 42)
+      pdf.text(activeReportAppt.patient_name || 'Patient', margin + 35, textYStart)
+      pdf.text(formatDateTime(activeReportAppt.appointment_date), margin + 35, textYStart + 7)
+      pdf.text(activeReportAppt.barcode || 'N/A', margin + 35, textYStart + 14)
+
+      pdf.text(activeReportAppt.id.slice(0, 8).toUpperCase(), margin + 135, textYStart)
+      
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(16, 185, 129)
+      pdf.text('CERTIFIED', margin + 135, textYStart + 7)
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(15, 23, 42)
+      const compDate = activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at) : new Date()
+      pdf.text(compDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }), margin + 135, textYStart + 14)
+      pdf.text(compDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), margin + 135, textYStart + 20)
+
+      y += 46
+      // Results Table Header
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(10)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('DIAGNOSTIC PANELS', margin, y)
+
+      y += 6
+      pdf.setDrawColor(203, 213, 225)
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      y += 6
+      pdf.setFontSize(8.5)
+      pdf.text('Test Parameter', margin + 2, y)
+      pdf.text('Observed Value', margin + 60, y)
+      pdf.text('Reference Range', margin + 100, y)
+      pdf.text('Measurement Unit', margin + 145, y)
+
+      y += 4
+      pdf.line(margin, y, pageWidth - margin, y)
+
+      // Table Rows
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(51, 65, 85)
+      
+      let lastTestName = ''
+      for (const res of reportResults) {
+        if (res.test_name !== lastTestName) {
+          y += 6
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(9)
+          pdf.setTextColor(30, 58, 138)
+          pdf.text(`${res.test_name} (${res.test_code.toUpperCase()})`, margin, y)
+          lastTestName = res.test_name
+          y += 2
+        }
+
+        y += 6
+        const displayName = res.parameter_name || res.test_name
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(8.5)
+        pdf.setTextColor(15, 23, 42)
+        pdf.text(displayName, margin + 4, y)
+
+        if (res.is_normal) {
+          pdf.setTextColor(15, 23, 42)
+          pdf.text(String(res.result_value), margin + 60, y)
+        } else {
+          pdf.setTextColor(225, 29, 72)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(`${res.result_value}  (ABNORMAL)`, margin + 60, y)
+          pdf.setFont('helvetica', 'normal')
+        }
+
+        pdf.setTextColor(71, 85, 105)
+        pdf.text(res.reference_range || '', margin + 100, y)
+        pdf.text(res.unit || '', margin + 145, y)
+
+        y += 2
+        pdf.setDrawColor(241, 245, 249)
+        pdf.line(margin, y + 1, pageWidth - margin, y + 1)
+      }
+
+      // Check remaining space for sign-off area
+      if (y > 225) {
+        pdf.addPage()
+        y = 25
+      } else {
+        y += 20
+      }
+
+      // Sign-off section without digital seal (for physical stamping & signature)
+      y += 18
+      pdf.setDrawColor(203, 213, 225)
+      pdf.setLineWidth(0.4)
+      pdf.line(margin, y, margin + 65, y)
+      
+      y += 5
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8.5)
+      pdf.setTextColor(15, 23, 42)
+      pdf.text('LIS Certified Medical Officer', margin, y)
+      
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(100, 116, 139)
+      pdf.setFontSize(7.5)
+      y += 4
+      pdf.text('Signature & Official Seal Stamp', margin, y)
+
+      // Right Column: Electronic Verification Info
+      const rightX = margin + 95
+      const verifyY = y - 27
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(16, 185, 129)
+      pdf.text('VERIFIED & CERTIFIED CLINICAL REPORT', rightX, verifyY)
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(71, 85, 105)
+      pdf.setFontSize(8.5)
+      pdf.text('Official Clinical Physical Copy', rightX, verifyY + 5)
+      
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(148, 163, 184)
+      pdf.setFontSize(7)
+      pdf.text('Issued at laboratory reception desk for physical presentation.', rightX, verifyY + 9)
+      pdf.text(`Verify online using Barcode Reference: ${activeReportAppt.barcode || 'N/A'}`, rightX, verifyY + 13)
+
+      pdf.save(`LIS_Report_${activeReportAppt.barcode || activeReportAppt.id.slice(0, 8)}.pdf`)
+    } catch (err) {
+      console.error('PDF generation error:', err)
+      alert('Could not download report PDF. Please try printing.')
+    } finally {
+      setDownloadingPDF(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Overview stats */}
@@ -376,6 +595,17 @@ export function ReceptionDashboardPage() {
                             >
                               <Receipt className="h-3.5 w-3.5 text-slate-400" />
                               Checkout Bill
+                            </button>
+                          )}
+
+                          {isCompleted && (
+                            <button
+                              onClick={() => fetchReportResults(appt)}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-2 transition shadow-sm"
+                              title="View & Print Diagnostic Report for Patient"
+                            >
+                              <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                              View Report
                             </button>
                           )}
                         </div>
@@ -731,6 +961,201 @@ export function ReceptionDashboardPage() {
                 <Printer className="h-4 w-4" />
                 Print Label
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reception Patient Report Modal Viewer (Unsealed for physical stamping & signature) */}
+      {activeReportAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          {/* Print styling for full page report */}
+          <style dangerouslySetInnerHTML={{
+            __html: `
+            @media print {
+              body * {
+                visibility: hidden;
+              }
+              #reception-printable-report, #reception-printable-report * {
+                visibility: visible;
+              }
+              #reception-printable-report {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                background: white !important;
+                padding: 20px !important;
+                margin: 0 !important;
+              }
+              .print\\:hidden, header, aside, button, nav {
+                display: none !important;
+              }
+            }
+          `}} />
+
+          <div className="w-full max-w-2xl bg-white rounded-3xl p-6 shadow-2xl flex flex-col max-h-[95vh] print:p-0 print:shadow-none print:w-full print:max-w-none print:h-auto print:max-h-none print:static">
+
+            {/* Header Actions */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 print:hidden">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Patient Diagnostic Report (Physical Printout Copy)
+                </h3>
+                <p className="text-xs text-slate-400 font-medium">Digital seal omitted for official physical stamping &amp; sign-off</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleDownloadReportPDF}
+                  disabled={downloadingPDF || loadingReport}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm disabled:opacity-50 transition"
+                >
+                  {downloadingPDF ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  {downloadingPDF ? 'Downloading...' : 'Download PDF'}
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print Report
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveReportAppt(null)
+                    setReportResults([])
+                  }}
+                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Report Content Container */}
+            <div className="flex-1 overflow-y-auto pr-1 print:overflow-visible print:pr-0 print:block">
+              {loadingReport ? (
+                <div className="flex items-center justify-center gap-3 py-16 text-slate-500 font-semibold text-sm">
+                  <LoaderCircle className="h-6 w-6 animate-spin text-blue-600" /> Retrieving patient diagnostic results...
+                </div>
+              ) : (
+                <div id="reception-printable-report" className="space-y-6 print:space-y-8 font-sans p-4">
+                  {/* Clinic Logo/Branding Header */}
+                  <div className="text-center pb-4 border-b-2 border-slate-900">
+                    <h2 className="text-2xl font-extrabold uppercase tracking-widest text-slate-900">Laboratory Information System (LIS)</h2>
+                    <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">Medical Diagnostics Clinic &amp; Laboratory Services</p>
+                    <p className="text-xxs text-slate-400 mt-0.5">Colombo, Sri Lanka • Tel: +94 11 234 5678</p>
+                  </div>
+
+                  {/* Patient/Metadata Panel */}
+                  <div className="grid grid-cols-2 gap-4 border border-slate-200 rounded-2xl p-4 bg-slate-50/50 print:border-slate-300 print:bg-transparent">
+                    <div className="space-y-1 text-xs text-slate-600 font-semibold">
+                      <p>Patient Name: <span className="font-extrabold text-slate-900">{activeReportAppt.patient_name || 'Patient'}</span></p>
+                      <p>Appointment: <span className="font-bold text-slate-800">{formatDateTime(activeReportAppt.appointment_date)}</span></p>
+                      <p>Barcode Sample: <span className="font-bold text-slate-800 font-mono">{activeReportAppt.barcode || 'N/A'}</span></p>
+                    </div>
+                    <div className="space-y-1 text-xs text-slate-600 text-right font-semibold">
+                      <p>Report Code: <span className="font-bold text-slate-800 uppercase">{activeReportAppt.id.slice(0, 8)}</span></p>
+                      <p>Status: <span className="font-extrabold text-emerald-600 uppercase">Certified</span></p>
+                      <div className="leading-tight">
+                        <span className="text-slate-500 font-semibold">Completed: </span>
+                        <span className="font-bold text-slate-800 whitespace-nowrap">
+                          {activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }) : 'N/A'}
+                        </span>
+                        <br />
+                        <span className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
+                          {activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Results Table */}
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2 mb-3">Diagnostic Panels</h4>
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-300 text-slate-400 uppercase tracking-wider text-[10px] font-bold">
+                          <th className="py-2.5">Test Parameter</th>
+                          <th className="py-2.5">Observed Value</th>
+                          <th className="py-2.5">Reference Range</th>
+                          <th className="py-2.5 text-right">Measurement Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {reportResults.map((res) => (
+                          <tr key={res.id} className="text-slate-700">
+                            <td className="py-3">
+                              <p className="font-bold text-slate-800">{res.parameter_name || res.test_name}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">
+                                {res.test_code} {res.parameter_name && res.parameter_name !== res.test_name ? `• ${res.test_name}` : ''}
+                              </p>
+                            </td>
+                            <td className="py-3 font-bold">
+                              <span className={res.is_normal ? 'text-slate-900' : 'text-rose-600 font-extrabold bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg'}>
+                                {res.result_value}
+                              </span>
+                              {!res.is_normal && (
+                                <span className="ml-1 text-[9px] font-bold uppercase tracking-widest text-rose-500 select-none">Abnormal</span>
+                              )}
+                            </td>
+                            <td className="py-3 text-slate-500 font-semibold">{res.reference_range}</td>
+                            <td className="py-3 text-slate-500 font-semibold text-right">{res.unit}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Physical Sign-off & Physical Seal Area (Seal intentionally omitted for physical stamping) */}
+                  <div className="pt-8 mt-10 border-t border-slate-200/80 grid grid-cols-2 gap-6 text-xs text-slate-500 print:pt-10 print:mt-8">
+                    {/* Left: Physical Signature & Physical Stamp Space */}
+                    <div className="text-left font-semibold">
+                      {/* Blank clearance space reserved for physical pen signature and manual rubber stamp */}
+                      <div className="h-16 flex items-center">
+                        <div className="border border-dashed border-slate-300 rounded-xl px-3 py-2 text-[9px] text-slate-400 font-medium italic">
+                          [ Place Physical Official Stamp &amp; Signature Here ]
+                        </div>
+                      </div>
+                      
+                      <div className="h-[1.5px] w-56 bg-slate-350 mt-1 mb-1.5" />
+                      <p className="font-bold text-slate-800 text-[11px]">LIS Certified Medical Officer</p>
+                      <p className="text-[10px] text-slate-400 font-medium leading-tight">Head of Diagnostic Pathology &amp; Clinical Services</p>
+                    </div>
+
+                    {/* Right: Electronic Verification & QR Code */}
+                    <div className="text-right flex flex-row items-center justify-end gap-4 font-semibold">
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          Verified &amp; Certified
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-700 italic">Official Physical Print Copy</p>
+                        <p className="text-[9px] font-medium text-slate-400 max-w-[210px] leading-tight">
+                          Issued by laboratory reception for physical patient presentation. Scan QR code to verify authenticity.
+                        </p>
+                      </div>
+                      {activeReportAppt.barcode && (
+                        <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex flex-col items-center shadow-xs shrink-0">
+                          <img
+                            alt="Verification QR"
+                            crossOrigin="anonymous"
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`http://localhost:5173/verify/${activeReportAppt.barcode}`)}`}
+                            className="w-14 h-14 object-contain"
+                          />
+                          <span className="text-[8px] font-extrabold text-blue-600 uppercase tracking-widest mt-1 block leading-none font-mono">
+                            {activeReportAppt.barcode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

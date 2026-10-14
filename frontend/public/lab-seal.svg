@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- Top arc path for text -->
+    <path id="topArc" d="M 50 200 A 150 150 0 1 1 350 200" fill="none" />
+    <!-- Bottom arc path for text -->
+    <path id="bottomArc" d="M 350 200 A 150 150 0 0 1 50 200" fill="none" />
+  </defs>
+
+  <g transform="rotate(-6 200 200)" opacity="0.88">
+    <!-- Outer solid circle -->
+    <circle cx="200" cy="200" r="185" fill="none" stroke="#1d4ed8" stroke-width="5" />
+    
+    <!-- Outer dashed border ring -->
+    <circle cx="200" cy="200" r="174" fill="none" stroke="#1d4ed8" stroke-width="1.8" stroke-dasharray="6,4" />
+
+    <!-- Inner circle separating text band -->
+    <circle cx="200" cy="200" r="126" fill="none" stroke="#1d4ed8" stroke-width="2.5" />
+
+    <!-- Core inner circle -->
+    <circle cx="200" cy="200" r="98" fill="none" stroke="#1d4ed8" stroke-width="1.5" />
+
+    <!-- Top curved text -->
+    <text fill="#1d4ed8" font-family="'Arial', 'Helvetica', sans-serif" font-size="14.5" font-weight="900" letter-spacing="3.5">
+      <textPath href="#topArc" startOffset="50%" text-anchor="middle">
+        CLINICAL DIAGNOSTICS &amp; PATHOLOGY
+      </textPath>
+    </text>
+
+    <!-- Bottom curved text -->
+    <text fill="#1d4ed8" font-family="'Arial', 'Helvetica', sans-serif" font-size="13" font-weight="800" letter-spacing="3">
+      <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">
+        ? QUALITY ASSURED &amp; ACCREDITED ?
+      </textPath>
+    </text>
+
+    <!-- Star icons on left and right text band -->
+    <polygon points="200,108 202.5,114 209,114.5 204,118.5 205.5,125 200,121 194.5,125 196,118.5 191,114.5 197.5,114" fill="#1d4ed8" transform="translate(-142, 92)" />
+    <polygon points="200,108 202.5,114 209,114.5 204,118.5 205.5,125 200,121 194.5,125 196,118.5 191,114.5 197.5,114" fill="#1d4ed8" transform="translate(142, 92)" />
+
+    <!-- Center Medical Cross Badge -->
+    <g transform="translate(200, 142)">
+      <rect x="-4" y="-14" width="8" height="28" rx="2" fill="#2563eb" opacity="0.9" />
+      <rect x="-14" y="-4" width="28" height="8" rx="2" fill="#2563eb" opacity="0.9" />
+    </g>
+
+    <!-- Center text -->
+    <text x="200" y="174" text-anchor="middle" fill="#1e40af" font-family="'Arial', 'Helvetica', sans-serif" font-size="17" font-weight="900" letter-spacing="2">
+      LABORATORY
+    </text>
+    <text x="200" y="196" text-anchor="middle" fill="#1d4ed8" font-family="'Arial', 'Helvetica', sans-serif" font-size="12" font-weight="800" letter-spacing="1.5">
+      VERIFIED &amp; CERTIFIED
+    </text>
+    <line x1="140" y1="206" x2="260" y2="206" stroke="#2563eb" stroke-width="1.2" stroke-dasharray="3,2" />
+    <text x="200" y="222" text-anchor="middle" fill="#2563eb" font-family="'Arial', 'Helvetica', sans-serif" font-size="9" font-weight="700" letter-spacing="2">
+      OFFICIAL SEAL
+    </text>
+    <text x="200" y="236" text-anchor="middle" fill="#3b82f6" font-family="'Arial', 'Helvetica', sans-serif" font-size="8" font-weight="600" letter-spacing="1">
+      LIS CLINICAL SERVICES
+    </text>
+  </g>
+</svg>

@@ -204,7 +204,7 @@ export function PatientPage() {
       pdf.setFillColor(248, 250, 252) // slate-50
       pdf.setDrawColor(226, 232, 240) // slate-200
       pdf.setLineWidth(0.2)
-      pdf.roundedRect(margin, y, contentWidth, 30, 3, 3, 'FD')
+      pdf.roundedRect(margin, y, contentWidth, 35, 3, 3, 'FD')
 
       // Metadata Text
       pdf.setFont('helvetica', 'bold')
@@ -216,9 +216,10 @@ export function PatientPage() {
       pdf.text('Appointment:', margin + 6, textYStart + 7)
       pdf.text('Barcode Sample:', margin + 6, textYStart + 14)
 
-      pdf.text('Report Code:', margin + 110, textYStart)
-      pdf.text('Status:', margin + 110, textYStart + 7)
-      pdf.text('Completion:', margin + 110, textYStart + 14)
+      pdf.text('Report Code:', margin + 105, textYStart)
+      pdf.text('Status:', margin + 105, textYStart + 7)
+      pdf.text('Completed Date:', margin + 105, textYStart + 14)
+      pdf.text('Time:', margin + 105, textYStart + 20)
 
       // Values
       pdf.setFont('helvetica', 'normal')
@@ -235,9 +236,11 @@ export function PatientPage() {
 
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(15, 23, 42)
-      pdf.text(formatDateTime(activeReportAppt.updated_at), margin + 135, textYStart + 14)
+      const compDate = activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at) : new Date()
+      pdf.text(compDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }), margin + 135, textYStart + 14)
+      pdf.text(compDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), margin + 135, textYStart + 20)
 
-      y += 42
+      y += 46
       // Results Table Header
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(10)
@@ -305,21 +308,46 @@ export function PatientPage() {
         pdf.line(margin, y + 1, pageWidth - margin, y + 1)
       }
 
-      y += 20
-      // Doctor/Staff Sign-off Section
+      // Signature block with official stamp seal
+      y += 18
+      try {
+        const sealImg = new Image()
+        sealImg.crossOrigin = 'anonymous'
+        sealImg.src = '/lab-seal.png'
+        if (sealImg.complete && sealImg.naturalWidth) {
+          pdf.addImage(sealImg, 'PNG', margin + 35, y - 6, 26, 26, undefined, 'FAST')
+        }
+      } catch (sealErr) {
+        console.warn('Seal could not be added to PDF:', sealErr)
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('AUTHORIZED SIGNATORY', margin, y)
+
+      y += 7
+      pdf.setFont('times', 'italic')
+      pdf.setFontSize(13)
+      pdf.setTextColor(30, 58, 138)
+      pdf.text('Dr. H. K. Jayawardena', margin, y)
+
+      y += 2
       pdf.setDrawColor(203, 213, 225)
-      pdf.line(margin, y, margin + 60, y)
+      pdf.setLineWidth(0.4)
+      pdf.line(margin, y, margin + 65, y)
       
       y += 5
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(8.5)
-      pdf.setTextColor(71, 85, 105)
-      pdf.text('Laboratory Technologist Signature', margin, y)
+      pdf.setTextColor(15, 23, 42)
+      pdf.text('LIS Certified Medical Officer', margin, y)
       
       pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(148, 163, 184)
+      pdf.setTextColor(100, 116, 139)
+      pdf.setFontSize(7.5)
       y += 4
-      pdf.text('LIS Certified Officer (Electronic Sign-off)', margin, y)
+      pdf.text('Head of Diagnostic Pathology & Clinical Services', margin, y)
 
       // Right Column: Electronic Verification Info
       const rightX = margin + 100
@@ -783,15 +811,24 @@ export function PatientPage() {
 
                   {/* Patient/Metadata Panel */}
                   <div className="grid grid-cols-2 gap-4 border border-slate-200 rounded-2xl p-4 bg-slate-50/50 print:border-slate-300 print:bg-transparent">
-                    <div className="space-y-1.5 text-xs text-slate-655 font-semibold">
+                    <div className="space-y-1 text-xs text-slate-655 font-semibold">
                       <p>Patient Name: <span className="font-extrabold text-slate-900">{activeReportAppt.patient_name || 'Patient'}</span></p>
                       <p>Appointment: <span className="font-bold text-slate-800">{formatDateTime(activeReportAppt.appointment_date)}</span></p>
                       <p>Barcode Sample: <span className="font-bold text-slate-800">{activeReportAppt.barcode || 'N/A'}</span></p>
                     </div>
-                    <div className="space-y-1.5 text-xs text-slate-655 text-right font-semibold">
+                    <div className="space-y-1 text-xs text-slate-655 text-right font-semibold">
                       <p>Report Code: <span className="font-bold text-slate-800 uppercase">{activeReportAppt.id.slice(0, 8)}</span></p>
                       <p>Status: <span className="font-extrabold text-emerald-600 uppercase">Certified</span></p>
-                      <p>Completion Date: <span className="font-bold text-slate-800">{formatDateTime(activeReportAppt.updated_at)}</span></p>
+                      <div className="leading-tight">
+                        <span className="text-slate-500 font-semibold">Completed: </span>
+                        <span className="font-bold text-slate-800 whitespace-nowrap">
+                          {activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' }) : 'N/A'}
+                        </span>
+                        <br />
+                        <span className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
+                          {activeReportAppt.updated_at ? new Date(activeReportAppt.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -832,28 +869,55 @@ export function PatientPage() {
                     </table>
                   </div>
 
-                  {/* Doctor/Staff Signature Area */}
-                  <div className="pt-12 mt-12 grid grid-cols-2 gap-8 text-xs text-slate-500 print:pt-16">
-                    <div className="text-left font-semibold">
-                      <p>Laboratory Technologist Signature</p>
-                      <div className="h-[1px] w-48 bg-slate-300 mt-12 mb-1" />
-                      <p className="font-bold text-slate-700">LIS Certified Officer</p>
-                      <p className="text-xxs font-medium text-slate-400">Automated sign-off via system authorization</p>
+                  {/* Doctor/Staff Signature & Official Seal Area */}
+                  <div className="pt-8 mt-10 border-t border-slate-200/80 grid grid-cols-2 gap-6 text-xs text-slate-500 print:pt-10 print:mt-8">
+                    {/* Left: Technologist Signature with Official Seal Stamp */}
+                    <div className="relative text-left font-semibold">
+                      {/* Dummy Seal in Blue Ink */}
+                      <div className="absolute -top-6 left-28 pointer-events-none select-none z-10 opacity-85 print:opacity-90">
+                        <img
+                          src="/lab-seal.png"
+                          alt="Official Laboratory Certified Seal"
+                          className="w-28 h-28 object-contain drop-shadow-sm filter contrast-125"
+                        />
+                      </div>
+
+                      <p className="text-slate-600 font-bold uppercase tracking-wider text-[10px]">Authorized Signatory</p>
+                      
+                      {/* Stylized digital signature representation */}
+                      <div className="h-12 flex items-end">
+                        <span className="font-serif italic text-lg text-blue-900 tracking-wide select-none opacity-90 font-medium">
+                          Dr. H. K. Jayawardena
+                        </span>
+                      </div>
+                      
+                      <div className="h-[1.5px] w-52 bg-slate-350 mt-1 mb-1.5" />
+                      <p className="font-bold text-slate-800 text-[11px]">LIS Certified Medical Officer</p>
+                      <p className="text-[10px] text-slate-400 font-medium leading-tight">Head of Diagnostic Pathology &amp; Clinical Services</p>
                     </div>
+
+                    {/* Right: Electronic Verification & QR Code */}
                     <div className="text-right flex flex-row items-center justify-end gap-4 font-semibold">
-                      <div>
-                        <p className="italic">Report Generated Electronically</p>
-                        <p className="text-[9px] font-medium text-slate-400 mt-1 max-w-[200px] leading-tight">This is an authentic system generated medical report. Scan the QR code to verify details.</p>
+                      <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                          Verified &amp; Certified
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-700 italic">Report Generated Electronically</p>
+                        <p className="text-[9px] font-medium text-slate-400 max-w-[210px] leading-tight">
+                          This is an authentic system-generated medical report issued under LIS accreditation. Scan QR to verify specimen integrity online.
+                        </p>
                       </div>
                       {activeReportAppt.barcode && (
-                        <div className="bg-white p-1 border border-slate-200 rounded-lg flex flex-col items-center shadow-xs">
+                        <div className="bg-white p-1.5 border border-slate-200 rounded-xl flex flex-col items-center shadow-xs shrink-0">
                           <img
                             alt="Verification QR"
                             crossOrigin="anonymous"
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`http://localhost:5173/verify/${activeReportAppt.barcode}`)}`}
                             className="w-14 h-14 object-contain"
                           />
-                          <span className="text-[7.5px] font-extrabold text-blue-600 uppercase tracking-widest mt-1 block leading-none">{activeReportAppt.barcode}</span>
+                          <span className="text-[8px] font-extrabold text-blue-600 uppercase tracking-widest mt-1 block leading-none font-mono">
+                            {activeReportAppt.barcode}
+                          </span>
                         </div>
                       )}
                     </div>
